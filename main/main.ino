@@ -22,8 +22,8 @@
 //#define REBUG
 //#define GEMMA
 //#define ITSYBITSY
-#define FEATHER
-//#define RCMX86_INTERNAL
+//#define FEATHER
+#define RCMX86_INTERNAL
 //#define EXEN_MINI **currently incomplete
 //#define RCMX86
 //#define R4S
@@ -199,6 +199,10 @@ void normalstraps() {
 #endif
 #ifdef USB_LOW_RESET
   pinMode(USB_LOW_RESET, INPUT);
+#endif
+#ifdef USB_LOGIC
+  pinMode(USB_LOGIC, OUTPUT);
+  digitalWrite(USB_LOGIC, LOW);
 #endif
 
 #ifdef RCMX86

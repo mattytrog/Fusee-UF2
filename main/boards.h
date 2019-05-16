@@ -99,7 +99,7 @@
 //#define MODE_CHANGE_PIN 4       // 
 #define JOYCON_STRAP_PIN 2         // Solder to pin 10 on joycon rail
 #define VOLUP_STRAP_PIN 1        
-#define ONBOARD_LED 3
+#define USB_LOGIC 3
 #endif
 
 #ifdef EXEN_MINI
