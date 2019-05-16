@@ -28,6 +28,7 @@ const PROGMEM byte HKSECTION_8 [12] = {
 #define inbetween_payloads_size 13
 
 //send hksection
+
 const PROGMEM byte inbetween_payloads [inbetween_payloads_size] = {
  0x00, 0x00, 0x00, 0x00, 0x50, 0x61, 0x79, 0x6C, 0x6F, 0x61, 0x64, 0x73,
   0x2F

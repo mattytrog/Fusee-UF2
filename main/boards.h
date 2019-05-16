@@ -94,9 +94,7 @@
 #ifdef RCMX86_INTERNAL
 #define BOARDNAME RCMX86_BOARD
 #define MODCHIP
-///#define PAYLOAD_INCREASE_PIN 3     // Payload increase pin - touch to ground by default.
 #define USB_LOW_RESET 4
-//#define MODE_CHANGE_PIN 4       // 
 #define JOYCON_STRAP_PIN 2         // Solder to pin 10 on joycon rail
 #define VOLUP_STRAP_PIN 1        
 #define USB_LOGIC 3
