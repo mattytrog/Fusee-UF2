@@ -19,7 +19,7 @@
 #ifndef _FE_INFO_H_
 #define _FE_INFO_H_
 
-void print_fuseinfo();
+int get_fuse_count();
 void print_kfuseinfo();
 void print_mmc_info();
 void print_sdcard_info();

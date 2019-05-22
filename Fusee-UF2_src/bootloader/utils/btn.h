@@ -20,9 +20,9 @@
 
 #include "types.h"
 
-#define BTN_POWER 0x1
-#define BTN_VOL_DOWN 0x2
-#define BTN_VOL_UP 0x4
+#define BTN_POWER    (1 << 0)
+#define BTN_VOL_DOWN (1 << 1)
+#define BTN_VOL_UP   (1 << 2)
 
 u32 btn_read();
 u32 btn_wait();

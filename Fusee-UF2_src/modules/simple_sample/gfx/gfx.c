@@ -125,7 +125,7 @@ void gfx_init_ctxt(gfx_ctxt_t *ctxt, u32 *fb, u32 width, u32 height, u32 stride)
 	ctxt->stride = stride;
 }
 
-void gfx_clear_grey(gfx_ctxt_t *ctxt, u8 color)
+void gfx_clear_black(gfx_ctxt_t *ctxt, u8 color)
 {
 	memset(ctxt->fb, color, 0x3C0000);
 }

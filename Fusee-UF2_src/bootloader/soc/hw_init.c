@@ -18,6 +18,14 @@
 #include <string.h>
 
 #include "hw_init.h"
+#include "clock.h"
+#include "fuse.h"
+#include "gpio.h"
+#include "i2c.h"
+#include "pinmux.h"
+#include "pmc.h"
+#include "t210.h"
+#include "uart.h"
 #include "../gfx/di.h"
 #include "../mem/mc.h"
 #include "../mem/sdram.h"
@@ -25,18 +33,11 @@
 #include "../power/max7762x.h"
 #include "../sec/se.h"
 #include "../sec/se_t210.h"
-#include "../soc/clock.h"
-#include "../soc/fuse.h"
-#include "../soc/gpio.h"
-#include "../soc/i2c.h"
-#include "../soc/pinmux.h"
-#include "../soc/pmc.h"
-#include "../soc/t210.h"
-#include "../soc/uart.h"
 #include "../storage/sdmmc.h"
 #include "../utils/util.h"
 
 extern sdmmc_t sd_sdmmc;
+extern boot_cfg_t b_cfg;
 
 void _config_oscillators()
 {
@@ -145,7 +146,9 @@ void _mbist_workaround()
 
 void _config_se_brom()
 {
-
+	// Skip SBK/SSK if sept was run.
+	if (!(b_cfg.boot_cfg & BOOT_CFG_SEPT_RUN))
+	{
 		// Bootrom part we skipped.
 		u32 sbk[4] = { 
 			FUSE(FUSE_PRIVATE_KEY0),
@@ -161,6 +164,7 @@ void _config_se_brom()
 
 		// Lock SSK (although it's not set and unused anyways).
 		SE(SE_KEY_TABLE_ACCESS_REG_OFFSET + 15 * 4) = 0x7E;
+	}
 
 	// This memset needs to happen here, else TZRAM will behave weirdly later on.
 	memset((void *)TZRAM_BASE, 0, 0x10000);
@@ -234,6 +238,9 @@ void config_hw()
 	// Fix GPU after warmboot for Linux.
 	i2c_send_byte(I2C_5, MAX77620_I2C_ADDR, MAX77620_REG_GPIO5, 2);
 	i2c_send_byte(I2C_5, MAX77620_I2C_ADDR, MAX77620_REG_GPIO6, 2);
+
+	// Disable low battery shutdown monitor.
+	max77620_low_battery_monitor_config();
 
 	_config_pmc_scratch(); // Missing from 4.x+
 

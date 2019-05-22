@@ -38,21 +38,6 @@
 
 #define HOS_PKG11_MAGIC 0x31314B50
 
-//leave here in case people want it coloured later
-/*#define COLOR_RED    0xFFE70000
-#define COLOR_ORANGE 0xFFFF8C00
-#define COLOR_YELLOW 0xFFFFFF40
-#define COLOR_GREEN  0xFF40FF00
-#define COLOR_BLUE   0xFF00DDFF
-#define COLOR_VIOLET 0xFF8040FF*/
-
-#define COLOR_RED    0xFF00FF00
-#define COLOR_ORANGE 0xFF00FF00
-#define COLOR_YELLOW 0xFF00FF00
-#define COLOR_GREEN  0xFF00FF00
-#define COLOR_BLUE   0xFF00FF00
-#define COLOR_VIOLET 0xFF00FF00
-
 typedef char s8;
 typedef short s16;
 typedef short SHORT;

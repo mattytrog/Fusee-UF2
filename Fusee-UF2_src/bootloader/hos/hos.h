@@ -51,6 +51,7 @@ typedef struct _launch_ctxt_t
 	void *pkg2;
 	u32   pkg2_size;
 
+	bool   new_pkg2;
 	void  *kernel;
 	u32    kernel_size;
 	link_t kip1_list;
@@ -63,6 +64,8 @@ typedef struct _launch_ctxt_t
 
 	ini_sec_t *cfg;
 } launch_ctxt_t;
+
+extern launch_ctxt_t *ctxt;
 
 typedef struct _merge_kip_t
 {

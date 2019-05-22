@@ -14,7 +14,7 @@
 #endif
 
 #ifdef TRINKETMETHOD3
-#define BOARDNAME TRINKET_BOARD
+#define BOARDNAME TRINKET_LEGACY3_BOARD
 #define MODCHIP
 #define DOTSTAR_ENABLED 1
 #define PAYLOAD_INCREASE_PIN 1     // Payload increase pin - touch to ground by default.
@@ -27,7 +27,7 @@
 #endif
 
 #ifdef TRINKETLEGACY3
-#define BOARDNAME TRINKET_BOARD
+#define BOARDNAME TRINKET_METHOD3_BOARD
 #define MODCHIP
 #define DOTSTAR_ENABLED 1
 #define PAYLOAD_INCREASE_PIN 1     // Payload increase pin - touch to ground by default.
@@ -94,10 +94,13 @@
 #ifdef RCMX86_INTERNAL
 #define BOARDNAME RCMX86_BOARD
 #define MODCHIP
+///#define PAYLOAD_INCREASE_PIN 3     // Payload increase pin - touch to ground by default.
 #define USB_LOW_RESET 4
+//#define MODE_CHANGE_PIN 4       // 
 #define JOYCON_STRAP_PIN 2         // Solder to pin 10 on joycon rail
 #define VOLUP_STRAP_PIN 1        
 #define USB_LOGIC 3
+#define ONBOARD_LED 0
 #endif
 
 #ifdef EXEN_MINI

@@ -34,7 +34,8 @@ void dump_emmc_user();
 void dump_emmc_boot();
 void dump_emmc_rawnand();
 void dump_emmc_quick();
-
+void restore_septprimary_dat();
+void restore_license_dat();
 void restore_emmc_boot();
 void restore_emmc_rawnand();
 void restore_emmc_gpp_parts();

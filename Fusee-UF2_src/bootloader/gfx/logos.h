@@ -21,7 +21,15 @@
 // 119 x 57 @24bpp RGB RAW positioned at 577 x 1199
 #define SZ_MENU_LOGO     0
 #define SZ_MENU_LOGO_BLZ  0
-static unsigned char Kc_MENU_LOGO_blz[SZ_MENU_LOGO_BLZ] = {};
+static unsigned char Kc_MENU_LOGO_blz[SZ_MENU_LOGO_BLZ] = {}; //left in skeleton if anyone wants to add back.
+
 #endif //MENU_LOGO_ENABLE
+
+// 68 x 192 @8bpp Grayscale RAW.
+#define X_BOOTLOGO         0
+#define Y_BOOTLOGO        0
+#define SZ_BOOTLOGO     0
+#define SZ_BOOTLOGO_BLZ  0
+//static u8 BOOTLOGO_BLZ[SZ_BOOTLOGO_BLZ] = {}; //left in skeleton if anyone wants to add back.
 
 #endif

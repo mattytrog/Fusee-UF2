@@ -1,0 +1,191 @@
+void dump_to_sd(u8 option){
+	if (sd_mount()){
+		dump_keys(false, 2);
+	} else {
+		sd_mount();
+		dump_keys(false, 2);
+	}
+	u32 staticx = 0; u32 staticy = 0; 
+	sd_mount();
+	se_aes_key_set(4, header_key + 0x00, 0x10);
+    se_aes_key_set(5, header_key + 0x10, 0x10);
+    se_aes_key_set(8, bis_key[2] + 0x00, 0x10);
+    se_aes_key_set(9, bis_key[2] + 0x10, 0x10);
+	
+	sdmmc_storage_set_mmc_partition(&storage, 0);
+    // Parse eMMC GPT.
+    LIST_INIT(gpt);
+    nx_emmc_gpt_parse(&gpt, &storage);
+
+    system_part = nx_emmc_part_find(&gpt, "SYSTEM");
+	gfx_clear_partial_black(0x00, 0, 1256);
+    gfx_con_setpos(0, 0);
+	sdmmc_t sdmmc;
+
+    sdmmc_storage_init_mmc(&storage, &sdmmc, SDMMC_4, SDMMC_BUS_WIDTH_8, 4);
+	char *srce = malloc(256);
+	char *dest = malloc(256);
+	char *dest_subdir = malloc(256);
+	char *srce_subdir = malloc(256);
+	char *parent_dir = malloc(256);
+	char path_src[100] = "emmc:";
+	char path_dst[100] = "sd:/decrypted";
+	bool subdir = false;
+	FATFS emmc_fs;
+	if (f_mount(&emmc_fs, "emmc:", 0)) {
+        EPRINTF("emmc Mount failed.");
+        return;
+    }
+	DIR dir;
+    FIL fsrc, fdst;      
+    BYTE buffer[8192];   
+    FRESULT fr;          
+    UINT br, bw;
+	fr = f_mkdir (path_dst);
+	
+	if (option == 2){
+	memcpy (path_src + strlen (path_src), "/", 2);
+	memcpy (path_src + strlen (path_src), "Contents", 9);
+	memcpy (path_src + strlen (path_src), "/", 2);
+	memcpy (path_src + strlen (path_src), "registered", 11);
+	
+	
+	memcpy (path_dst + strlen (path_dst), "/", 2);
+	memcpy (path_dst + strlen (path_dst), "Contents", 9);
+	fr = f_mkdir (path_dst);
+	memcpy (path_dst + strlen (path_dst), "/", 2);
+	memcpy (path_dst + strlen (path_dst), "registered", 11);
+	fr = f_mkdir (path_dst);
+	}
+	
+	if (option == 1){
+	memcpy (path_src + 5, "/", 2);
+	memcpy (path_src + 6, "save", 5);
+	fr = f_mkdir (path_dst);
+	memcpy (path_dst + strlen(path_dst), "/", 2);
+	memcpy (path_dst + strlen(path_dst), "save", 5);
+	fr = f_mkdir (path_dst);
+	}
+	
+	fr = f_opendir(&dir, path_src);
+	FILINFO fno;
+	if (fr) 
+	{
+		EPRINTFARGS ("\nFailed opening %s", path_src); 
+		btn_wait();
+		} else gfx_printf ("\nSuccess opening %s", path_src);
+	fr = f_opendir(&dir, path_src);
+    if (fr) 
+	{
+		EPRINTFARGS ("\nFailed opening %s", path_dst); 
+		btn_wait();
+		} else gfx_printf ("\nSuccess opening %s", path_dst);
+	
+	while (fr == FR_OK && fno.fname[0]){
+		
+	gfx_clear_partial_black(0x00, 0, 1256);
+    gfx_con_setpos(0, 0);
+	
+		
+	fr = f_readdir(&dir, &fno);	
+	if (fr)
+		{ 
+		EPRINTF ("\nFailed reading dir file");
+		btn_wait();
+		} else gfx_printf ("\nSuccess reading dir file");
+		////////////////////////////////////////////////////////////////////////////////////////////////////////
+	if (fno.fattrib & AM_DIR){
+		memcpy (srce_subdir + 0, path_src, strlen(path_src) + 1);
+		memcpy (srce_subdir + strlen (srce_subdir), "/", 2);
+		memcpy (srce_subdir + strlen (srce_subdir), fno.fname, strlen(fno.fname) + 1);
+		memcpy (dest_subdir + 0, path_dst, strlen(path_dst) + 1);
+		
+		fr = f_opendir(&dir, dest_subdir);
+		memcpy (dest_subdir + strlen (dest_subdir), "/", 2);
+		memcpy (dest_subdir + strlen (dest_subdir), fno.fname, strlen(fno.fname) + 1);
+		fr = f_opendir(&dir, srce_subdir);
+		fr = f_mkdir(dest_subdir);
+		if (fr) {
+			EPRINTFARGS ("\nFailed making dir\n%s", fno.fname); 
+		}
+		fr = f_open(&fsrc, srce_subdir, FA_READ);	//open src
+		if (fr)
+		{ 
+		EPRINTFARGS ("\nFailed opening source\n%s", srce_subdir);
+		btn_wait();
+		} else gfx_printf ("\nSuccess opening source\n%s\n", srce_subdir);
+
+		////////////////////////////////////////////////////////////////////////////////////////////////////////
+	memcpy (srce + 0, path_src, strlen(path_src) + 1);
+	memcpy (srce + strlen (srce), "/", 2);
+	memcpy (srce + strlen (srce), fno.fname, strlen(fno.fname) + 1);
+	fr = f_open(&fsrc, srce, FA_READ);	//open src
+	}
+	if (fr)
+		{ 
+		EPRINTFARGS ("\nFailed opening source\n%s", srce);
+		btn_wait();
+		} else gfx_printf ("\nSuccess opening source\n%s\n", srce);
+	
+	memcpy (dest + 0, path_dst, strlen(path_dst) + 1);
+	memcpy (dest + strlen(dest), "/", 2);
+	memcpy (dest + strlen (dest), fno.fname, strlen(fno.fname) + 1);
+	fr = f_open(&fdst, dest, FA_WRITE | FA_CREATE_ALWAYS);
+	if (fr)
+		{ 
+		EPRINTFARGS ("\nFailed opening dest\n%s", dest);
+		btn_wait();
+		} else gfx_printf ("\nSuccess opening dest\n%s\n", dest);
+	gfx_printf ("\nThis can take a long time!\nTo quit, hold down [VOL]\n");
+	gfx_con_getpos(&staticx, &staticy);
+	u8 spin = 1;
+    for (;;) {
+		++spin;
+        fr = f_read(&fsrc, buffer, sizeof buffer, &br);
+		
+        if (fr || br == 0) break;
+		gfx_con_setpos(staticx, staticy);
+		switch (spin)
+		{
+		case 1:
+		gfx_con_setpos(staticx, staticy);
+		gfx_printf ("|");
+		break;
+		case 2:
+		gfx_con_setpos(staticx, staticy);
+		gfx_printf ("/");
+		break;
+		case 3:
+		gfx_con_setpos(staticx, staticy);
+		gfx_printf ("-");
+		break;
+		case 4:
+		gfx_con_setpos(staticx, staticy);
+		gfx_printf ("\\");
+		break;
+		}
+				
+        fr = f_write(&fdst, buffer, br, &bw);            
+        if (fr || bw < br) break;
+		gfx_con_setpos(staticx, staticy);
+		
+		u8 btn = btn_wait_timeout(0, BTN_VOL_DOWN | BTN_VOL_UP);
+		if (btn & BTN_VOL_DOWN || btn & BTN_VOL_UP)
+			{
+				gfx_printf ("\nCancelled.");
+				msleep(1000);
+				return;
+			}
+		if (spin == 4) spin = 1;
+    }
+	EPRINTFARGS ("\nComplete\n%s\n%s\n", srce, dest);
+	subdir = false;
+	f_close(&fsrc);
+    f_close(&fdst);
+	msleep(2000);
+	}
+	btn_wait();
+	
+}
+
+	

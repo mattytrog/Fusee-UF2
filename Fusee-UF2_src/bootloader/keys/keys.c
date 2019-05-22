@@ -19,9 +19,11 @@
 #include "../gfx/gfx.h"
 #include "../hos/pkg1.h"
 #include "../hos/pkg2.h"
+#include "../hos/hos.h"
 #include "../hos/sept.h"
 #include "../libs/fatfs/ff.h"
 #include "../mem/heap.h"
+#include "../mem/mc.h"
 #include "../rtc/max77620-rtc.h"
 #include "../sec/se.h"
 #include "../sec/se_t210.h"
@@ -37,25 +39,23 @@
 
 #include <string.h>
 #include <stdarg.h>
+#include <stdlib.h>
 
 extern gfx_ctxt_t gfx_ctxt;
 extern gfx_con_t gfx_con;
 
 extern bool sd_mount();
 extern void sd_unmount();
+extern bool factory_reset;
 extern void *sd_file_read(char *path);
 extern int  sd_save_to_file(void *buf, u32 size, const char *filename);
-
 u32 _key_count = 0;
 sdmmc_storage_t storage;
 emmc_part_t *system_part;
 
 #define TPRINTF(text) \
     end_time = get_tmr_ms(); \
-    gfx_printf(&gfx_con, text"Completed. %d.%03ds\n\n", (end_time - start_time) / 1000, (end_time - start_time) % 1000)
-#define TPRINTFARGS(text, args...) \
-    end_time = get_tmr_ms(); \
-    gfx_printf(&gfx_con, text"Completed. %d.%03ds\n\n", args, (end_time - start_time) / 1000, (end_time - start_time) % 1000)
+    gfx_printf(text"Completed. %d.%03ds\n\n", (end_time - start_time) / 1000, (end_time - start_time) % 1000)
 #define SAVE_KEY(name, src, len) _save_key(name, src, len, text_buffer, &buf_index)
 #define SAVE_KEY_FAMILY(name, src, count, len) _save_key_family(name, src, count, len, text_buffer, &buf_index)
 
@@ -208,7 +208,6 @@ static u8 temp_key[0x10],
           package2_key[KB_FIRMWARE_VERSION_MAX+1][0x10] = {0},
           titlekek[KB_FIRMWARE_VERSION_MAX+1][0x10] = {0};
 
-static const u32 colors[6] = {COLOR_RED, COLOR_ORANGE, COLOR_YELLOW, COLOR_GREEN, COLOR_BLUE, COLOR_VIOLET};
 
 // key functions
 static bool   _key_exists(const void *data) { return memcmp(data, zeros, 0x10); };
@@ -225,17 +224,16 @@ static u32  _puts(char *buffer, const char *s);
 static u32  _putn(char *buffer, u32 v, int base, char fill, int fcnt);
 static u32  _sprintf(char *buffer, const char *fmt, ...);
 
-void dump_keys() {
-    display_backlight_brightness(100, 1000);
-    gfx_clear_partial_grey(&gfx_ctxt, 0x00, 0, 1256);
-    gfx_con_setpos(&gfx_con, 0, 0);
-
-    gfx_printf(&gfx_con, "L o c k p i c k - R C M\n\n", 0xFF00FF00);
+void dump_keys(const bool savetosd, const u8 which_keys) {
+   display_backlight_brightness(100, 1000);
+    gfx_clear_partial_black(0x00, 0, 1256);
+    gfx_con_setpos(0, 0);
+	
 
     u32 start_time = get_tmr_ms(),
         end_time,
         retries = 0;
-
+	launch_ctxt_t ctxt;
     tsec_ctxt_t tsec_ctxt;
     sdmmc_t sdmmc;
 
@@ -251,16 +249,23 @@ void dump_keys() {
         goto out_wait;
     }
 
+    u32 MAX_KEY = 6;
+    if (pkg1_id->kb >= KB_FIRMWARE_VERSION_620)
+        MAX_KEY = pkg1_id->kb + 1;
+
     if (pkg1_id->kb >= KB_FIRMWARE_VERSION_700) {
+		
         if (!f_stat("sd:/sept/payload.bak", NULL)) {
             f_unlink("sd:/sept/payload.bin");
             f_rename("sd:/sept/payload.bak", "sd:/sept/payload.bin");
         }
 
         if (!(EMC(EMC_SCRATCH0) & EMC_SEPT_RUN)) {
+			gfx_printf(" Sept needs to run.\n\n Please re-run this option\n\n once rebooted.");
+			msleep(2000);
             FIL fp;
             if (f_stat("sd:/sept/sept-primary.bin", NULL) || f_stat("sd:/sept/sept-secondary.enc", NULL)) {
-                EPRINTF("On firmware 7.x but no sept payload present\nSkipping new key derivation...");
+                EPRINTF("On firmware 7.x or higher but no sept payload present\nSkipping new key derivation...");
                 goto get_tsec;
             }
             // backup post-reboot payload
@@ -271,8 +276,8 @@ void dump_keys() {
             u32 payload_size = *(u32 *)(IPL_LOAD_ADDR + 0x84) - IPL_LOAD_ADDR;
             f_write(&fp, (u8 *)IPL_LOAD_ADDR, payload_size, NULL);
             f_close(&fp);
-            gfx_printf(&gfx_con, "%kFirmware 7.x detected.\n%kRenamed /sept/payload.bin", colors[0], colors[1]);
-            gfx_printf(&gfx_con, "\n%k     to /sept/payload.bak\n%kCopied self to /sept/payload.bin",colors[2], colors[3]);
+            gfx_printf("Firmware 7.x or higher detected.\nRenamed /sept/payload.bin");
+            gfx_printf("\n     to /sept/payload.bak\nCopied self to /sept/payload.bin");
             sdmmc_storage_end(&storage);
             if (!reboot_to_sept((u8 *)pkg1 + pkg1_id->tsec_off))
                 goto out_wait;
@@ -307,22 +312,26 @@ get_tsec: ;
 
     int res = 0;
 
+    mc_disable_ahb_redirect();
+
     while (tsec_query(tsec_keys, pkg1_id->kb, &tsec_ctxt) < 0) {
         memset(tsec_keys, 0x00, 0x20);
         retries++;
-        if (retries > 3) {
+        if (retries > 15) {
             res = -1;
             break;
         }
     }
     free(pkg1);
 
+    mc_enable_ahb_redirect();
+
     if (res < 0) {
         EPRINTFARGS("ERROR %x dumping TSEC.\n", res);
         goto out_wait;
     }
 
-    TPRINTFARGS("%kTSEC key(s)...  ", colors[0]);
+    TPRINTF("TSEC key(s)...  ");
 
     // Master key derivation
     if (pkg1_id->kb == KB_FIRMWARE_VERSION_620 && _key_exists(tsec_keys + 0x10)) {
@@ -360,8 +369,8 @@ get_tsec: ;
         se_aes_cmac(3, keyblob_mac, 0x10, keyblob_block + 0x10, 0xa0);
         if (memcmp(keyblob_block, keyblob_mac, 0x10)) {
             EPRINTFARGS("Keyblob %x corrupt.", i);
-            gfx_hexdump(&gfx_con, i, keyblob_block, 0x10);
-            gfx_hexdump(&gfx_con, i, keyblob_mac, 0x10);
+            gfx_hexdump(i, keyblob_block, 0x10);
+            gfx_hexdump(i, keyblob_mac, 0x10);
             continue;
         }
 
@@ -376,7 +385,7 @@ get_tsec: ;
     }
     free(keyblob_block);
 
-    TPRINTFARGS("%kMaster keys...  ", colors[1]);
+    TPRINTF("Master keys...  ");
 
     /*  key = unwrap(source, wrapped_key):
         key_set(ks, wrapped_key), block_ecb(ks, 0, key, source) -> final key in key
@@ -435,11 +444,15 @@ get_tsec: ;
     se_aes_key_set(8, master_key[pkg1_id->kb], 0x10);
     se_aes_unwrap_key(8, 8, package2_key_source);
     pkg2_hdr_t *pkg2_hdr = pkg2_decrypt(pkg2);
+    if (!pkg2_hdr) {
+        EPRINTF("Failed to decrypt Package2.");
+        goto pkg2_done;
+    }
 
-    TPRINTFARGS("%kDecrypt pkg2... ", colors[2]);
+    TPRINTF("Decrypt pkg2... ");
 
     LIST_INIT(kip1_info);
-    pkg2_parse_kips(&kip1_info, pkg2_hdr);
+    pkg2_parse_kips(&kip1_info, pkg2_hdr, &ctxt.new_pkg2);
     LIST_FOREACH_ENTRY(pkg2_kip1_info_t, ki_tmp, &kip1_info, link) {
         if(ki_tmp->kip1->tid == 0x0100000000000000ULL) {
             ki = malloc(sizeof(pkg2_kip1_info_t));
@@ -456,7 +469,7 @@ get_tsec: ;
     }
 
     pkg2_decompress_kip(ki, 2 | 4); // we only need .rodata and .data
-    TPRINTFARGS("%kExpanding FS...", colors[3]);
+    TPRINTF("Decompress FS...");
 
     u8  hash_index = 0, hash_max = 9, hash_order[10],
         key_lengths[10] = {0x10, 0x20, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x20, 0x20};
@@ -475,7 +488,7 @@ get_tsec: ;
         u8 temp[7] = {2, 3, 4, 0, 5, 6, 1};
         memcpy(hash_order, temp, 7);
     } else {
-        // 2.0.0 - 7.0.1
+        // 2.0.0 - 8.0.0
         alignment = 0x40;
         switch (pkg1_id->kb) {
         case KB_FIRMWARE_VERSION_100_200:
@@ -508,7 +521,7 @@ get_tsec: ;
             break;
         case KB_FIRMWARE_VERSION_700:
             start_offset = 0x29c50;
-            hks_offset_from_end = 0x18bf5;
+            hks_offset_from_end -= 0x6a73;
             alignment = 8;
             break;
         }
@@ -527,11 +540,6 @@ get_tsec: ;
         se_calc_sha256(temp_hash, ki->kip1->data + i, key_lengths[hash_order[hash_index]]);
         if (!memcmp(temp_hash, fs_hashes_sha256[hash_order[hash_index]], 0x20)) {
             memcpy(fs_keys[hash_order[hash_index]], ki->kip1->data + i, key_lengths[hash_order[hash_index]]);
-            /*if (hash_index == hash_max) {
-                TPRINTFARGS("%d: %x    end -%x", hash_index, (*(ki->kip1->data + i)), ki->size - i);
-            } else {
-                TPRINTFARGS("%d: %x rodata +%x", hash_index, (*(ki->kip1->data + i)), i - ki->kip1->sections[0].size_comp);
-            }*/
             i += key_lengths[hash_order[hash_index]];
             if (hash_index == hash_max - 1) {
                 i = ki->size - hks_offset_from_end;
@@ -548,7 +556,7 @@ pkg2_done:
     free(pkg2);
     free(ki);
 
-    TPRINTFARGS("%kFS keys...      ", colors[4]);
+    TPRINTF("FS keys...      ");
 
     if (_key_exists(fs_keys[0]) && _key_exists(fs_keys[1]) && _key_exists(master_key[0])) {
         _generate_kek(8, fs_keys[0], master_key[0], aes_kek_generation_source, aes_key_generation_source);
@@ -560,8 +568,6 @@ pkg2_done:
         _generate_kek(8, fs_keys[5], device_key, aes_kek_generation_source, NULL);
         se_aes_crypt_block_ecb(8, 0, save_mac_key, fs_keys[6]);
     }
-
-    u32 MAX_KEY = pkg1_id->kb < KB_FIRMWARE_VERSION_620 ? 6 : pkg1_id->kb + 1;
 
     for (u32 i = 0; i < MAX_KEY; i++) {
         if (!_key_exists(master_key[i]))
@@ -578,10 +584,6 @@ pkg2_done:
     }
 
 
-    if (memcmp(pkg1_id->id, "2016", 4))
-        gfx_printf(&gfx_con, "%kES & SSL keys... ", colors[5]);
-    else
-        gfx_printf(&gfx_con, "%kSSL keys...      ", colors[5]);
     if (!_key_exists(header_key) || !_key_exists(bis_key[2]))
         goto key_output;
 
@@ -596,7 +598,7 @@ pkg2_done:
         goto key_output;
     }
     FATFS emmc_fs;
-    if (f_mount(&emmc_fs, "emmc:", 1)) {
+    if (f_mount(&emmc_fs, "emmc:", 0)) {
         EPRINTF("Mount failed.");
         goto key_output;
     }
@@ -612,24 +614,13 @@ pkg2_done:
         title_limit = 1;
     u8 *temp_file = NULL;
 
-    u32 x, y, spinner_time = get_tmr_ms(), spinner_idx = 0, color_idx = 0;
-    char spinner[4] = {'/', '-', '\\', '|'};
-    gfx_con_getpos(&gfx_con, &x, &y);
-
     if (f_opendir(&dir, path)) {
         EPRINTF("Failed to open System:/Contents/registered.");
         goto dismount;
     }
 
     // prepopulate /Contents/registered in decrypted sector cache
-    while (!f_readdir(&dir, &fno) && fno.fname[0]) {
-        if (get_tmr_ms() - spinner_time > 75) {
-            spinner_time = get_tmr_ms();
-            gfx_con_setpos(&gfx_con, x, y);
-            gfx_con_setcol(&gfx_con, colors[color_idx++ % 6], 1, 0xFF000000);
-            gfx_putc(&gfx_con, spinner[spinner_idx++ % 4]);
-        }
-    }
+    while (!f_readdir(&dir, &fno) && fno.fname[0]) {}
     f_closedir(&dir);
 
     if (f_opendir(&dir, path)) {
@@ -641,12 +632,6 @@ pkg2_done:
     start_offset = 0;
 
     while (!f_readdir(&dir, &fno) && fno.fname[0] && titles_found < title_limit) {
-        if (get_tmr_ms() - spinner_time > 75) {
-            spinner_time = get_tmr_ms();
-            gfx_con_setpos(&gfx_con, x, y);
-            gfx_con_setcol(&gfx_con, colors[color_idx++ % 6], 1, 0xFF000000);
-            gfx_putc(&gfx_con, spinner[spinner_idx++ % 4]);
-        }
         memcpy(path + 26, fno.fname, 36);
         path[62] = 0;
         if (fno.fattrib & AM_DIR)
@@ -692,8 +677,8 @@ pkg2_done:
             }
             hash_index = 0;
             // decrypt only what is needed to locate needed keys
-            temp_file = (u8*)_nca_process(5, 4, &fp, start_offset, 0x50);
-            for (u32 i = 0; i <= 0x40; ) {
+            temp_file = (u8*)_nca_process(5, 4, &fp, start_offset, 0xc0);
+            for (u32 i = 0; i <= 0xb0; ) {
                 se_calc_sha256(temp_hash, temp_file + i, 0x10);
                 if (!memcmp(temp_hash, es_hashes_sha256[hash_order[hash_index]], 0x10)) {
                     memcpy(es_keys[hash_order[hash_index]], temp_file + i, 0x10);
@@ -734,8 +719,8 @@ pkg2_done:
             }
             if (!memcmp(pkg1_id->id, "2016", 4))
                 start_offset = 0x449dc;
-            temp_file = (u8*)_nca_process(5, 4, &fp, start_offset, 0x50);
-            for (u32 i = 0; i <= 0x40; i++) {
+            temp_file = (u8*)_nca_process(5, 4, &fp, start_offset, 0x70);
+            for (u32 i = 0; i <= 0x60; i++) {
                 se_calc_sha256(temp_hash, temp_file + i, 0x10);
                 if (!memcmp(temp_hash, ssl_hashes_sha256[1], 0x10)) {
                     memcpy(ssl_keys[1], temp_file + i, 0x10);
@@ -787,6 +772,29 @@ pkg2_done:
         }
     }
     f_close(&fp);
+	
+	
+/*		
+	
+
+	
+	char *oldsrse = malloc(256);
+	
+	char *olddest = malloc(256);
+	bool dest_subdir = false;
+    
+	
+	f_mkdir (path_dst);
+	
+
+	
+
+    
+    f_close(&fsrc);
+    f_close(&fdst);
+
+   
+*/
 
     // derive eticket_rsa_kek and ssl_rsa_kek
     if (_key_exists(es_keys[0]) && _key_exists(es_keys[1]) && _key_exists(master_key[0])) {
@@ -803,12 +811,10 @@ pkg2_done:
     }
 
 dismount:
+	
     f_mount(NULL, "emmc:", 1);
     nx_emmc_gpt_free(&gpt);
-    sdmmc_storage_end(&storage);
-
-    gfx_con_setpos(&gfx_con, x - 16, y);
-    TPRINTFARGS("%k", colors[5]);
+    
 
 key_output: ;
     char *text_buffer = (char *)calloc(0x4000, 1);
@@ -870,23 +876,36 @@ key_output: ;
     if (pkg1_id->kb == KB_FIRMWARE_VERSION_620)
         SAVE_KEY("tsec_root_key", tsec_keys + 0x10, 0x10);
 
-    //gfx_con.fntsz = 8; gfx_puts(&gfx_con, text_buffer); gfx_con.fntsz = 16;
+    //gfx_con.fntsz = 8; gfx_puts(text_buffer); gfx_con.fntsz = 16;
 
-    TPRINTFARGS("\n%kFound %d keys.\n%k", colors[0], _key_count, colors[1]);
-
-    f_mkdir("switch");
-    if (!sd_save_to_file(text_buffer, buf_index, "sd:/switch/prod.keys"))
-        gfx_printf(&gfx_con, "%kWrote %d bytes to /switch/prod.keys\n", colors[2], buf_index);
-    else
-        EPRINTF("Failed to save keys to SD.");
-    sd_unmount();
-    free(text_buffer);
-
-    gfx_printf(&gfx_con, "\n%kPress any key", 0xFFFFFFFF);
-
+    gfx_printf("\nFound %d keys.\n", _key_count);
+		
+		if (savetosd == true){
+			f_mkdir("switch");
+			if (!sd_save_to_file(text_buffer, buf_index, "sd:/switch/prod.keys")){
+				gfx_printf("Updated prod.keys file\n");
+				_key_count = 0;
+				free(text_buffer);
+				sdmmc_storage_end(&storage);
+			}
+			else
+			{
+				EPRINTF("Failed to save keys to SD.");
+				btn_wait();
+			}
+		} else if (savetosd == false){
+		gfx_printf("Skipped updating prod.keys file\n");
+		_key_count = 0;
+		}
+		sd_unmount();
+		
+	
 out_wait: ;
-    btn_wait();
+msleep(1000);
+	return;
 }
+
+
 
 static void _save_key(const char *name, const void *data, const u32 len, char *outbuf, u32 *buf_index) {
     if (!_key_exists(data))
@@ -1083,4 +1102,219 @@ static u32 _sprintf(char *buffer, const char *fmt, ...) {
     out:
     va_end(ap);
     return count;
+}
+
+void dump_to_sd(const u8 option){
+	if (sd_mount()){
+		dump_keys(false, 2);
+	} else {
+		sd_mount();
+		dump_keys(false, 2);
+	}
+	u32 staticx = 0; u32 staticy = 0; 
+	sd_mount();
+	se_aes_key_set(4, header_key + 0x00, 0x10);
+    se_aes_key_set(5, header_key + 0x10, 0x10);
+    se_aes_key_set(8, bis_key[2] + 0x00, 0x10);
+    se_aes_key_set(9, bis_key[2] + 0x10, 0x10);
+	
+	sdmmc_storage_set_mmc_partition(&storage, 0);
+    // Parse eMMC GPT.
+    LIST_INIT(gpt);
+    nx_emmc_gpt_parse(&gpt, &storage);
+
+    system_part = nx_emmc_part_find(&gpt, "SYSTEM");
+	gfx_clear_black(0x00);
+    gfx_con_setpos(0, 0);
+	gfx_con.fntsz = 8;
+	sdmmc_t sdmmc;
+
+    sdmmc_storage_init_mmc(&storage, &sdmmc, SDMMC_4, SDMMC_BUS_WIDTH_8, 4);
+	char *srce = malloc(256);
+	char *dest = malloc(256);
+	char *dest_levelup = malloc(256);
+	char *srce_levelup = malloc(256);
+	char *path_src_complete = malloc(256);
+	char *path_dst_complete = malloc(256);
+	char *path_src = malloc(256);
+	char *path_dst = malloc(256);
+	char *path_src_2 = malloc(256);
+	char *path_src_3 = malloc(256);
+	char *path_dst_2 = malloc(256);
+	char *path_dst_3 = malloc(256);
+	char *src_subdir_name = malloc(256);
+	bool subdir = false;
+	u8 subfile_name = 0;
+	
+	if (option == 1){
+	path_src = "emmc:";
+	path_dst = "sd:/decrypted";
+	path_src_2 = "save";
+	path_src_3 = "\0";
+	path_dst_2 = "save";
+	path_dst_3 = "\0";
+	}
+	if (option == 2){
+	path_src = "emmc:";
+	path_dst = "sd:/decrypted";
+	path_src_2 = "Contents";
+	path_src_3 = "registered";
+	path_dst_2 = "Contents";
+	path_dst_3 = "registered";
+	}
+
+	FATFS emmc_fs;
+	if (f_mount(&emmc_fs, "emmc:", 0)) {
+        EPRINTF("emmc Mount failed.");
+		btn_wait();
+        return;
+    }
+	DIR dir;
+    FIL fsrc, fdst;      
+    BYTE buffer[8192];   
+    FRESULT fr;          
+    UINT br, bw;
+	FILINFO fno;
+	
+	fr = f_mkdir(path_dst); // make initial directory
+	//build desired directory structure from emmc
+	memcpy (path_src_complete + 0, path_src, strlen(path_src) + 1);
+	if(strcmp(path_src_2, "\0") !=0){
+	memcpy (path_src_complete + strlen(path_src_complete), "/", 2);
+	memcpy (path_src_complete + strlen(path_src_complete), path_src_2, strlen(path_src_2) + 1);
+	}
+	if(strcmp(path_src_3, "\0") !=0){
+	memcpy (path_src_complete + strlen(path_src_complete), "/", 2);
+	memcpy (path_src_complete + strlen(path_src_complete), path_src_3, strlen(path_src_3) + 1);
+	}
+	
+	//build dest
+	memcpy (path_dst_complete + 0, path_dst, strlen(path_dst) + 1);
+	
+	if(strcmp(path_dst_2, "\0") !=0){
+	memcpy (path_dst_complete + strlen(path_dst_complete), "/", 2);
+	memcpy (path_dst_complete + strlen(path_dst_complete), path_dst_2, strlen(path_dst_2) + 1);
+	fr = f_mkdir(path_dst_complete); //make directory to copy into
+	}
+	if(strcmp(path_dst_3, "\0") !=0){
+	memcpy (path_dst_complete + strlen(path_dst_complete), "/", 2);
+	memcpy (path_dst_complete + strlen(path_dst_complete), path_dst_3, strlen(path_dst_3) + 1);
+	fr = f_mkdir(path_dst_complete); //make directory to copy into
+	}
+	gfx_printf ("%s\n",path_src_complete);
+	gfx_printf ("%s\n",path_dst_complete);
+	//add result to final src & dest
+	
+	memcpy (srce + 0, path_src_complete, strlen(path_src_complete)+1);
+	memcpy (dest + 0, path_dst_complete, strlen(path_dst_complete)+1);
+	
+	fr = f_opendir(&dir, srce);
+	if (fr){EPRINTFARGS ("\nFailed opening source dir\n%s", srce); btn_wait();}
+	  else {gfx_printf ("\nSuccess opening source dir\n");}
+	gfx_printf ("\nThis can take a long time!\nTo quit, hold down [VOL]\n");
+	while (fr == FR_OK && fno.fname[0])	
+	{		
+		fr = f_readdir(&dir, &fno);
+		if (fr)
+				{ 
+				EPRINTFARGS ("\nFailed reading dir. Last file:%s", fno.fname);
+				btn_wait(); return;
+				}
+		if (fno.fattrib & AM_DIR) subdir = true;
+		
+			memcpy (srce + 0, path_src_complete, strlen(path_src_complete)+1);
+			memcpy (dest + 0, path_dst_complete, strlen(path_dst_complete)+1);
+			memcpy (srce + strlen(srce), "/", 2);
+			memcpy (srce + strlen(srce), fno.fname, strlen(fno.fname)+1);
+			memcpy (srce_levelup + 0, srce, strlen(srce)+1);
+			memcpy (dest_levelup + 0, dest, strlen(dest)+1);
+			memcpy (dest + strlen(dest), "/", 2);
+			memcpy (dest + strlen(dest), fno.fname, strlen(fno.fname)+1);
+			memcpy (srce_levelup + 0, srce, strlen(srce)+1);//backup current so we can return after any subdir
+			memcpy (dest_levelup + 0, dest, strlen(dest)+1);
+			if (subdir && subfile_name == 0) src_subdir_name = "00";
+			
+		if (subdir){
+			fr = f_mkdir(dest);	
+			memcpy (srce + strlen(srce), "/", 2);
+			memcpy (srce + strlen(srce), src_subdir_name, 3);
+			memcpy (dest + strlen(dest), "/", 2);
+			memcpy (dest + strlen(dest), src_subdir_name, 3);
+		}
+		
+		fr = f_open(&fsrc, srce, FA_READ);	//open src
+			if (fr)
+				{ 
+				EPRINTFARGS ("\nStopped. Last file:\n%s\n%s", srce, dest);
+				btn_wait(); return;
+				} else gfx_printf ("\nSuccess reading src file\n%s", srce);
+		fr = f_unlink(dest);//get rid of partially existing file, if present.
+		fr = f_open(&fdst, dest, FA_WRITE | FA_CREATE_ALWAYS);
+			if (fr)
+				{ 
+				EPRINTFARGS ("\nFailed reading dest file\n%s", dest);
+				btn_wait(); return;
+				} else gfx_printf ("\nSuccess reading dest file\n%s\n", dest);
+				
+			
+			gfx_con_getpos(&staticx, &staticy);
+			u8 spin = 1;
+				for (;;) 
+				{
+					++spin;
+					fr = f_read(&fsrc, buffer, sizeof buffer, &br);
+					
+					if (fr || br == 0) break;
+					gfx_con_setpos(staticx, staticy);
+					switch (spin)
+					{
+					case 1:
+					gfx_con_setpos(staticx, staticy);
+					gfx_printf ("|");
+					break;
+					case 2:
+					gfx_con_setpos(staticx, staticy);
+					gfx_printf ("/");
+					break;
+					case 3:
+					gfx_con_setpos(staticx, staticy);
+					gfx_printf ("-");
+					break;
+					case 4:
+					gfx_con_setpos(staticx, staticy);
+					gfx_printf ("\\");
+					break;
+					}
+							
+					fr = f_write(&fdst, buffer, br, &bw);            
+					if (fr || bw < br) break;
+					gfx_con_setpos(staticx, staticy);
+					
+					u8 btn = btn_wait_timeout(0, BTN_VOL_DOWN | BTN_VOL_UP);
+					if (btn & BTN_VOL_DOWN || btn & BTN_VOL_UP)
+						{
+							gfx_printf ("\nCancelled.");
+							msleep(1000);
+							return;
+						}
+					if (spin == 4) spin = 1;
+				}	
+				if (subdir){
+					memcpy (srce + 0, srce_levelup, strlen(srce_levelup)+1);//restore old dir after accessing subdir
+					memcpy (dest + 0, dest_levelup, strlen(dest_levelup)+1);
+					subdir = false;
+				}
+					
+				f_close(&fsrc);
+				f_close(&fdst);
+				gfx_con_getpos(&staticx, &staticy);
+				if (staticy >= 1200){
+				gfx_clear_black(0x00);
+				gfx_con_setpos(0, 0);
+				}
+	}
+	if (fr) EPRINTFARGS ("Error:%d", fr);
+	fr = f_closedir(&dir);
+	gfx_printf ("\nComplete.%s", fno.fname);
+	btn_wait();
 }

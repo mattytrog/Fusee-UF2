@@ -312,8 +312,8 @@ bool is_ipl_updated(void *buf)
 int launch_payload(char *path, bool update)
 {
 	if (!update)
-		gfx_clear_grey(&gfx_ctxt, 0x00);
-	gfx_con_setpos(&gfx_con, 0, 0);
+		gfx_clear_black( 0x00);
+	gfx_con_setpos( 0, 0);
 	if (!path)
 		return 1;
 
@@ -456,8 +456,8 @@ void launch_tools(u8 type)
 
 	ment_t *ments = (ment_t *)malloc(sizeof(ment_t) * (max_entries + 3));
 
-	gfx_clear_grey(&gfx_ctxt, 0x00);
-	gfx_con_setpos(&gfx_con, 0, 0);
+	gfx_clear_black( 0x00);
+	gfx_con_setpos( 0, 0);
 
 	if (sd_mount())
 	{
@@ -501,7 +501,7 @@ void launch_tools(u8 type)
 					"Choose a file to launch", 0, 0
 			};
 			
-			file_sec = (char *)tui_do_menu(&gfx_con, &menu);
+			file_sec = (char *)tui_do_menu( &menu);
 
 			if (!file_sec)
 			{
@@ -562,8 +562,8 @@ void ini_list_launcher()
 	ini_sec_t *cfg_sec = NULL;
 	LIST_INIT(ini_list_sections);
 
-	gfx_clear_grey(&gfx_ctxt, 0x00);
-	gfx_con_setpos(&gfx_con, 0, 0);
+	gfx_clear_black( 0x00);
+	gfx_con_setpos( 0, 0);
 
 	if (sd_mount())
 	{
@@ -598,7 +598,7 @@ void ini_list_launcher()
 					ments, "Launch ini configurations", 0, 0
 				};
 
-				cfg_tmp = (ini_sec_t *)tui_do_menu(&gfx_con, &menu);
+				cfg_tmp = (ini_sec_t *)tui_do_menu( &menu);
 
 				if (cfg_tmp)
 				{
@@ -676,8 +676,8 @@ void launch_firmware()
 	ini_sec_t *cfg_sec = NULL;
 	LIST_INIT(ini_sections);
 
-	gfx_clear_grey(&gfx_ctxt, 0x00);
-	gfx_con_setpos(&gfx_con, 0, 0);
+	gfx_clear_black( 0x00);
+	gfx_con_setpos( 0, 0);
 
 	if (sd_mount())
 	{
@@ -715,7 +715,7 @@ void launch_firmware()
 				ments, "Launch configurations", 0, 0
 			};
 
-			cfg_tmp = (ini_sec_t *)tui_do_menu(&gfx_con, &menu);
+			cfg_tmp = (ini_sec_t *)tui_do_menu( &menu);
 
 			if (cfg_tmp)
 			{
@@ -758,8 +758,8 @@ void launch_firmware()
 
 	if (!cfg_sec)
 	{
-		gfx_puts(&gfx_con, "\nPress POWER to Continue.\nPress VOL to go to the menu.\n\n");
-		gfx_printf(&gfx_con, "\nUsing default launch configuration...\n\n\n");
+		gfx_puts( "\nPress POWER to Continue.\nPress VOL to go to the menu.\n\n");
+		gfx_printf( "\nUsing default launch configuration...\n\n\n");
 
 		u32 btn = btn_wait();
 		if (!(btn & BTN_POWER))
@@ -973,7 +973,7 @@ void auto_launch_firmware()
 					bmpData.pos_y = (1280 - bmpData.size_y) >> 1;
 					// Get background color from 1st pixel.
 					if (bmpData.size_x < 720 || bmpData.size_y < 1280)
-						gfx_clear_color(&gfx_ctxt, *(u32 *)BOOTLOGO);
+						gfx_clear_color( *(u32 *)BOOTLOGO);
 
 					bootlogoFound = true;
 				}
@@ -985,7 +985,7 @@ void auto_launch_firmware()
 		// Render boot logo.
 		if (bootlogoFound)
 		{
-			gfx_render_bmp_argb(&gfx_ctxt, (u32 *)BOOTLOGO, bmpData.size_x, bmpData.size_y,
+			gfx_render_bmp_argb( (u32 *)BOOTLOGO, bmpData.size_x, bmpData.size_y,
 				bmpData.pos_x, bmpData.pos_y);
 		}
 		else
@@ -1058,10 +1058,10 @@ void about()
 		"   Copyright (C) 2018, M4xw\n"
 		" ___________________________________________\n\n";
 		
-	gfx_clear_grey(&gfx_ctxt, 0x00);
-	gfx_con_setpos(&gfx_con, 0, 0);
+	gfx_clear_black( 0x00);
+	gfx_con_setpos( 0, 0);
 
-	gfx_printf(&gfx_con, credits, 0xFF00CCFF, 0xFFFFFFFF);
+	gfx_printf( credits, 0xFF00CCFF, 0xFFFFFFFF);
 	gfx_con.fntsz = 8;
 
 	btn_wait();
@@ -1275,20 +1275,20 @@ void ipl_main()
 	display_init();
 
 	u32 *fb = display_init_framebuffer();
-	gfx_init_ctxt(&gfx_ctxt, fb, 720, 1280, 720);
+	gfx_init_ctxt( fb, 720, 1280, 720);
 
 #ifdef MENU_LOGO_ENABLE
 	Kc_MENU_LOGO = (u8 *)malloc(ALIGN(SZ_MENU_LOGO, 0x1000));
 	blz_uncompress_srcdest(Kc_MENU_LOGO_blz, SZ_MENU_LOGO_BLZ, Kc_MENU_LOGO, SZ_MENU_LOGO);
 #endif
 
-	gfx_con_init(&gfx_con, &gfx_ctxt);
+	gfx_con_init( &gfx_ctxt);
 
 	display_backlight_pwm_init();
 	u32 btn = btn_wait_timeout(1000, BTN_VOL_DOWN);
 	if (btn & BTN_VOL_DOWN){
 		while (true)
-		tui_do_menu(&gfx_con, &menu_top);
+		tui_do_menu( &menu_top);
 
 	} else {
 		auto_launch_lockpick();
@@ -1301,6 +1301,6 @@ void ipl_main()
 		}
 		msleep(1000);
 		while (true)
-		tui_do_menu(&gfx_con, &menu_top);
+		tui_do_menu( &menu_top);
 	}
 }

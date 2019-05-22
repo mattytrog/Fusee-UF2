@@ -49,16 +49,16 @@ static bool sd_mounted;
 bool septactive;
 u8 folder;
 
+//hekate_config h_cfg;
+boot_cfg_t __attribute__((section ("._boot_cfg"))) b_cfg;
+
 bool sd_mount()
 {
 	if (sd_mounted)
 		return true;
 
-	if (!sdmmc_storage_init_sd(&sd_storage, &sd_sdmmc, SDMMC_1, SDMMC_BUS_WIDTH_4, 11))
-	{
-		EPRINTF("Failed to init SD card.\nMake sure that it is inserted.\nOr that SD reader is properly seated!");
-	}
-	else
+	if (sdmmc_storage_init_sd(&sd_storage, &sd_sdmmc, SDMMC_1, SDMMC_BUS_WIDTH_4, 11))
+	
 	{
 		int res = 0;
 		res = f_mount(&sd_fs, "", 1);
@@ -101,6 +101,57 @@ int sd_save_to_file(void *buf, u32 size, const char *filename)
 	f_close(&fp);
 
 	return 0;
+}
+
+void emmcsn_path_impl(char *path, char *sub_dir, char *filename, sdmmc_storage_t *storage)
+{
+	sdmmc_storage_t storage2;
+	bool init_done = false;
+	
+	u32 sub_dir_len = strlen(sub_dir);   // Can be a null-terminator.
+	u32 filename_len = strlen(filename); // Can be a null-terminator.
+	
+	if (folder == 0){
+	memcpy(path, "safe", 5);
+	goto start;
+	} else if (folder != 0 && folder <= 10) { 
+	memcpy(path, "backup", 7);
+	f_mkdir(path);
+	memcpy(path + strlen(path), "/", 2);
+	memcpy(path + strlen(path), "BACKUP_", 8);
+	}
+		if (folder == 1){
+			memcpy(path + strlen(path), "1", 2);
+		} else if (folder == 2){
+			memcpy(path + strlen(path), "2", 2);
+		} else if (folder == 3){
+			memcpy(path + strlen(path), "3", 2);
+		} else if (folder == 4){
+			memcpy(path + strlen(path), "4", 2);
+		} else if (folder == 5){
+			memcpy(path + strlen(path), "5", 2);
+		} else if (folder == 6){
+			memcpy(path + strlen(path), "6", 2);
+		} else if (folder == 7){
+			memcpy(path + strlen(path), "7", 2);
+		} else if (folder == 8){
+			memcpy(path + strlen(path), "8", 2);
+	} else if (folder == 11){
+	memcpy(path, "screenshot", 11);
+	}
+	
+start:	
+	f_mkdir(path);
+	
+	memcpy(path + strlen(path), sub_dir, sub_dir_len + 1);
+	if (sub_dir_len)
+		f_mkdir(path);
+	memcpy(path + strlen(path), "/", 2);
+	memcpy(path + strlen(path), filename, filename_len + 1);
+	
+	if (init_done)
+		sdmmc_storage_end(&storage2);
+	
 }
 
 void check_power_off_from_hos()
@@ -186,8 +237,74 @@ int launch_payload(char *path, bool update)
 
 	return 1;
 }
+		
+void auto_launch_payload_bin()
+{
+	FIL fp;
+	if (sd_mount())
+		{
+			if (f_open(&fp, "aaaaaaaaaaa", FA_READ))
+				return;
+			else
+			{
+				f_close(&fp);
+				launch_payload("aaaaaaaaaaa", false);
+			}
 
-void auto_launch_switchboot()
+		}
+	}
+	
+	
+	
+	void auto_launch_numbered_payload_bin()
+{
+	FIL fp;
+	if (sd_mount())
+		{
+			if (f_open(&fp, "bbbbbbbbbbbb", FA_READ))
+				return;
+			else
+			{
+				f_close(&fp);
+				launch_payload("bbbbbbbbbbbb", false);
+			}
+
+		}
+	}
+	
+	void auto_launch_payload_bin_folder()
+{
+	FIL fp;
+	if (sd_mount())
+		{
+			if (f_open(&fp, "bootloader/payloads/ccccccccccc", FA_READ))
+				return;
+			else
+			{
+				f_close(&fp);
+				launch_payload("bootloader/payloads/ccccccccccc", false);
+			}
+
+		}
+	}
+	
+	void auto_launch_numbered_payload_bin_folder()
+{
+	FIL fp;
+	if (sd_mount())
+		{
+			if (f_open(&fp, "bootloader/payloads/dddddddddddd", FA_READ))
+				return;
+			else
+			{
+				f_close(&fp);
+				launch_payload("bootloader/payloads/dddddddddddd", false);
+			}
+
+		}
+	}
+	
+	void auto_launch_switchboot()
 {
 	
 	FIL fp;
@@ -203,6 +320,7 @@ void auto_launch_switchboot()
 
 		}
 	}
+	
 	void auto_launch_argon()
 {
 	FIL fp;
@@ -218,39 +336,6 @@ void auto_launch_switchboot()
 
 		}
 	}
-	
-void auto_launch_payload_bin()
-{
-	FIL fp;
-	if (sd_mount())
-		{
-			if (f_open(&fp, "payload.bin", FA_READ))
-				return;
-			else
-			{
-				f_close(&fp);
-				launch_payload("payload.bin", false);
-			}
-
-		}
-	}
-	
-	void auto_launch_payload_bin_folder()
-{
-	FIL fp;
-	if (sd_mount())
-		{
-			if (f_open(&fp, "Payloads/payload.bin", FA_READ))
-				return;
-			else
-			{
-				f_close(&fp);
-				launch_payload("Payloads/payload.bin", false);
-			}
-
-		}
-	}
-	
 	void auto_launch_update_bin()
 {
 	FIL fp;
@@ -267,60 +352,32 @@ void auto_launch_payload_bin()
 		}
 	}
 	
-void auto_launch_numbered_payload_bin()
-{
-	FIL fp;
-	if (sd_mount())
-		{
-			if (f_open(&fp, "payload1.bin", FA_READ))
-				return;
-			else
-			{
-				f_close(&fp);
-				launch_payload("payload1.bin", false);
-			}
-
-		}
-	}
-	void auto_launch_numbered_payload_bin_folder()
-{
-	FIL fp;
-	if (sd_mount())
-		{
-			if (f_open(&fp, "Payloads/payload1.bin", FA_READ))
-				return;
-			else
-			{
-				f_close(&fp);
-				launch_payload("Payloads/payload1.bin", false);
-			}
-
-		}
-	}
-	
 int create_chip_data()
 {
 //this file is created on-the-fly. The SAMD/straps decide if to change these values or not by sending YES or NO to a buffered usb write. Cheeky.
 FIL fp;
 	if (sd_mount())
 		{
-			if (f_open(&fp, "straps_info.txt", FA_CREATE_ALWAYS | FA_WRITE))
+			f_mkdir("bootloader");
+			f_mkdir("bootloader/fusee");
+			f_mkdir("bootloader/payloads");
+			if (f_open(&fp, "bootloader/fusee/straps_info.txt", FA_CREATE_ALWAYS | FA_WRITE))
 				return 0;
 			else
 			{
-				f_puts("Payload Override:   payload.bin", &fp);
+				f_puts("Running in standalone mode. Modchip          ", &fp);
 				f_puts("\n\n", &fp);
-				f_puts("SAMD selection:   No chip found", &fp);
+				f_puts("information is not available. Strap data     ", &fp);
 				f_puts("\n\n", &fp);
-				f_puts("Mode:             No chip found", &fp);
+				f_puts("requires your SAMD21 to be fitted inside the ", &fp);
 				f_puts("\n\n", &fp);
-				f_puts("USB:              No chip found", &fp);
+				f_puts("console. Thank-you for your interest in      ", &fp);
 				f_puts("\n\n", &fp);
-				f_puts("VOL+:             No chip found", &fp);
+				f_puts("Fusee-UF2 and Switchboot.                    ", &fp);
 				f_puts("\n\n", &fp);
-				f_puts("Joycon:           No chip found", &fp);
+				f_puts("---------------------------------------------", &fp);
 				f_puts("\n\n", &fp);
-				f_puts("No chip found.                 ", &fp);
+				f_puts("+++++++++++++++++++++++++++++++++++++++++++++", &fp);
 				f_close(&fp);
 				return 1;
 			}
@@ -333,7 +390,7 @@ int create_readme()
 FIL fp;
 	if (sd_mount())
 		{
-			if (f_open(&fp, "paths_info.txt", FA_CREATE_ALWAYS | FA_WRITE))
+			if (f_open(&fp, "bootloader/fusee/paths_info.txt", FA_CREATE_ALWAYS | FA_WRITE))
 				return 0;
 			else
 			{
@@ -347,15 +404,23 @@ FIL fp;
 				f_puts("\n\n", &fp);
 				f_puts("The first one found will boot.", &fp);
 				f_puts("\n", &fp);
-				f_puts("\n1. bootloader/switchboot.bin (my hekate mod for chipped units)", &fp);
-				f_puts("\n2. argon/argon.bin (touchscreen payload launcher)", &fp);
-				f_puts("\n3. payload.bin (Can be anything you want it to be)", &fp);
-				f_puts("\n4. Payloads/payload.bin (Can be anything you want it to be)(keeps SD root tidy)", &fp);
-				f_puts("\n5. payload1.bin (changes depending on SAMD setting)", &fp);
-				f_puts("\n6. Payloads/payload1.bin (changes depending on SAMD setting)(keeps SD root tidy)", &fp);
-				f_puts("\n7. bootloader/update.bin (last chance saloon - for Kosmos etc users - no need for payload.bin if this present - probably hekate)", &fp);
+				f_puts("\n1. payload.bin (Can be anything you want it to be)", &fp);
+				f_puts("\n2. payload1.bin (changes depending on SAMD setting)", &fp);
+				f_puts("\n3. bootloader/payloads/payload.bin (Can be anything you want it to be)(keeps SD root tidy)", &fp);
+				f_puts("\n4. bootloader/payloads/payload1.bin (changes depending on SAMD setting)(keeps SD root tidy)", &fp);
+				f_puts("\n5. argon/argon.bin (touchscreen payload launcher)", &fp);
+				f_puts("\n6. bootloader/update.bin - Kosmos users - Hekate. Can be anything.", &fp);
+				f_puts("\n7. bootloader/switchboot.bin (my hekate mod for chipped units)", &fp);
+				
+				
 				f_puts("\n\n", &fp);
 				f_puts("Remember... First entry found will boot. Kosmos users don`t need to do anything... update.bin will boot automatically", &fp);
+				f_puts("\n", &fp);
+				f_puts("\nControls:", &fp);
+				f_puts("\n[VOL+]+[VOL-] - create paths_info.txt", &fp);
+				f_puts("\n[VOL+] - create SXOS licence.dat", &fp);
+				f_puts("\n[VOL-] - launch bootloader/switchboot (if present). If not present, launch bootloader/update.bin. If neither present, try argon/argon.bin", &fp);
+				f_puts("\n\n", &fp);
 				f_close(&fp);
 				return 1;
 			}
@@ -392,13 +457,13 @@ int create_license_dat(){
 	}
 	//does it exist?
 	if (f_stat("license.dat", NULL) == FR_OK){
-		gfx_printf(&gfx_con,"\nSXOS license.dat exists!\n\nCancelled.");
+		gfx_printf("\nRelease button!\n\nSXOS license.dat exists!\n\nCancelled.\n\n");
 		msleep(3000);
 		return 0;
 	} else {
-		gfx_printf(&gfx_con,"\nPlease wait\n\n");
+		gfx_printf("\nRelease button!\n\nPlease wait\n\n");
 	sd_save_to_file(license_dat, sizeof(license_dat), "license.dat");
-		gfx_printf(&gfx_con,"Success. Written %d bytes", sizeof(license_dat));
+		gfx_printf("Success. Written %d bytes\n\n", sizeof(license_dat));
 	sd_unmount();
 	msleep(3000);
 	}
@@ -425,34 +490,47 @@ void ipl_main()
 	display_backlight_pwm_init();
 	display_backlight_brightness(100, 1000);
 	u32 *fb = display_init_framebuffer();
-	gfx_init_ctxt(&gfx_ctxt, fb, 720, 1280, 720);
-	gfx_con_init(&gfx_con, &gfx_ctxt);
-	gfx_clear_grey(&gfx_ctxt, 0x00);
-	gfx_con_setpos(&gfx_con, 0, 0);
+	gfx_init_ctxt( fb, 720, 1280, 720);
+	gfx_con_init( &gfx_ctxt);
+	gfx_clear_black( 0x00);
+	gfx_con_setpos( 0, 0);
 	
-	u8 btn = btn_wait_timeout(0, BTN_VOL_DOWN | BTN_VOL_UP);
-	if ((btn & BTN_VOL_DOWN && !(btn & BTN_VOL_UP)) || (!(btn & BTN_VOL_DOWN) && btn & BTN_VOL_UP)){
-	u8 res = create_readme();
-	if (res) gfx_puts(&gfx_con, "\nReadme Created\n");
-	msleep(1000);
-	} else if (btn & BTN_VOL_DOWN && btn & BTN_VOL_UP){
-		
-	u8 res = create_license_dat(); 
-	if (res) gfx_puts(&gfx_con, "\nSXOS Licence.dat created\n");
-	msleep(1000);
-	}
-	create_chip_data();
-	auto_launch_switchboot();
-	auto_launch_argon();
-	auto_launch_payload_bin();
-	auto_launch_payload_bin_folder();
-	auto_launch_numbered_payload_bin();
-	auto_launch_numbered_payload_bin_folder();
-	auto_launch_update_bin();
-	
-	
-	gfx_puts(&gfx_con, "\nPlease check SD card\n\nNot found:\n\npayload.bin\npayload1.bin\n");
-	msleep(3000);
 	check_power_off_from_hos();
+	create_chip_data();
+	u8 btn = btn_wait_timeout(0, BTN_VOL_DOWN | BTN_VOL_UP);
+	if (btn & BTN_VOL_DOWN && btn & BTN_VOL_UP){
+	u8 res = create_readme();
+	if (res) gfx_puts( "\nReadme Created:\nbootloader/fusee/paths_info.txt\n");
+	msleep(2000);
+	} else if ((!(btn & BTN_VOL_UP) && btn & BTN_VOL_DOWN)){
+	gfx_puts( "\nSkipped launching payload.bin.\n");
+	auto_launch_switchboot();
+	gfx_puts( "\nNot found: bootloader/switchboot.bin\n");
+	auto_launch_update_bin();
+	gfx_puts( "Not found: bootloader/update.bin\n");
+	auto_launch_argon();
+	gfx_puts( "Not found: argon/argon.bin");
+	
+	
+	} else if ((!(btn & BTN_VOL_DOWN) && btn & BTN_VOL_UP)){	
+	u8 res = create_license_dat(); 
+	if (res) gfx_puts( "\nSXOS Licence.dat created\n");
+	msleep(1000);
+	} 
+	auto_launch_payload_bin();
+	auto_launch_numbered_payload_bin();
+	auto_launch_payload_bin_folder();
+	auto_launch_numbered_payload_bin_folder();
+
+	auto_launch_argon();
+	auto_launch_update_bin();
+	auto_launch_switchboot();
+	
+	gfx_puts( "\nNot found: payload.bin, payload1.bin\n\nPowering off. Hold [VOL+] to cencel.\n\n");
+	
+	if (btn_wait_timeout(3000, BTN_VOL_UP)){
+		gfx_puts( "\nAuto power-off cancelled.\nHold [POWER] to switch off.\n");
+		for(;;){};
+	}
 	power_off();
 }

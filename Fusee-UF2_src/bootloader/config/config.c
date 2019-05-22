@@ -44,6 +44,13 @@ void set_default_configuration()
 	h_cfg.errors = 0;
 	h_cfg.autonogc = 1;
 	h_cfg.sept_run = EMC(EMC_SCRATCH0) & EMC_SEPT_RUN;
+	h_cfg.rcm_patched = true;
+	h_cfg.sd_timeoff = 0;
+}
+
+void set_reboot_configuration()
+{
+	h_cfg.autoboot = 0;
 }
 
 int create_config_entry()
@@ -77,8 +84,7 @@ int create_config_entry()
 		}
 	}
 
-	if (f_open(&fp, "bootloader/hekate_ipl.ini", FA_WRITE | FA_CREATE_ALWAYS) != FR_OK)
-		return 1;
+	f_open(&fp, "bootloader/hekate_ipl.ini", FA_WRITE | FA_CREATE_ALWAYS);
 	// Add config entry.
 	f_puts("[config]\nautoboot=", &fp);
 	itoa(h_cfg.autoboot, lbuf, 10);
@@ -154,20 +160,20 @@ int create_config_entry()
 
 static void _save_config()
 {
-	gfx_clear_grey(&gfx_ctxt, 0x00);
-	gfx_con_setpos(&gfx_con, 0, 0);
+	gfx_clear_black(0x00);
+	gfx_con_setpos(0, 0);
 
 	if (!create_config_entry())
-		gfx_puts(&gfx_con, "\nConfiguration was saved!\n");
+		gfx_puts("\nConfiguration was saved!\n");
 	else
 		EPRINTF("\nConfiguration saving failed!");
-	gfx_puts(&gfx_con, "\nPress any key...");
+	gfx_puts("\nPress any key...");
 }
 
 static void _config_autoboot_list(void *ent)
 {
-	gfx_clear_grey(&gfx_ctxt, 0x00);
-	gfx_con_setpos(&gfx_con, 0, 0);
+	gfx_clear_black(0x00);
+	gfx_con_setpos(0, 0);
 
 	u32 *temp_autoboot = NULL;
 
@@ -225,7 +231,7 @@ static void _config_autoboot_list(void *ent)
 
 			memset(&ments[i], 0, sizeof(ment_t));
 			menu_t menu = {ments, "Select an entry to auto boot", 0, 0};
-			temp_autoboot = (u32 *)tui_do_menu(&gfx_con, &menu);
+			temp_autoboot = (u32 *)tui_do_menu(&menu);
 			if (temp_autoboot != NULL)
 			{
 				h_cfg.autoboot = *(u32 *)temp_autoboot;
@@ -240,13 +246,16 @@ static void _config_autoboot_list(void *ent)
 		}
 		else
 		{
-			EPRINTF("Could not open 'bootloader/hekate_ipl.ini'.\nMake sure it exists!.");
+			EPRINTF("\n\n Could not open 'bootloader/hekate_ipl.ini'.\n\n Press [PWR] to receate blank ini.");
 			goto out;
 		}
 	}
 
 out:;
-	btn_wait();
+	u8 btn = btn_wait();
+	if (btn & BTN_POWER){
+		create_config_entry();
+	}
 out2:;
 	free(ments);
 	free(boot_values);
@@ -258,8 +267,8 @@ out2:;
 
 void config_autoboot()
 {
-	gfx_clear_grey(&gfx_ctxt, 0x00);
-	gfx_con_setpos(&gfx_con, 0, 0);
+	gfx_clear_black(0x00);
+	gfx_con_setpos(0, 0);
 
 	u32 *temp_autoboot = NULL;
 
@@ -335,13 +344,13 @@ void config_autoboot()
 			{
 				ments[i].type = MENT_CAPTION;
 				ments[i].caption = "No main configurations found...";
-				ments[i].color = 0xFFFFDD00;
+				ments[i].color = 0xFFFFFF00;
 				i++;
 			}
 
 			memset(&ments[i], 0, sizeof(ment_t));
 			menu_t menu = {ments, "Disable or select entry to auto boot", 0, 0};
-			temp_autoboot = (u32 *)tui_do_menu(&gfx_con, &menu);
+			temp_autoboot = (u32 *)tui_do_menu(&menu);
 			if (temp_autoboot != NULL)
 			{
 				h_cfg.autoboot = *(u32 *)temp_autoboot;
@@ -353,13 +362,16 @@ void config_autoboot()
 		}
 		else
 		{
-			EPRINTF("Could not open 'bootloader/hekate_ipl.ini'.\nMake sure it exists!.");
+			EPRINTF("\n\n Could not open 'bootloader/hekate_ipl.ini'.\n\n Press [PWR] to receate blank ini.");
 			goto out;
 		}
 	}
 
 out:;
-	btn_wait();
+	u8 btn = btn_wait();
+	if (btn & BTN_POWER){
+		create_config_entry();
+	}
 out2:;
 	free(ments);
 	free(boot_values);
@@ -374,8 +386,8 @@ out2:;
 
 void config_bootdelay()
 {
-	gfx_clear_grey(&gfx_ctxt, 0x00);
-	gfx_con_setpos(&gfx_con, 0, 0);
+	gfx_clear_black(0x00);
+	gfx_con_setpos(0, 0);
 
 	u32 delay_entries = 6;
 
@@ -416,7 +428,7 @@ void config_bootdelay()
 	memset(&ments[i + 2], 0, sizeof(ment_t));
 	menu_t menu = {ments, "Time delay for entering bootloader menu", 0, 0};
 
-	u32 *temp_bootwait = (u32 *)tui_do_menu(&gfx_con, &menu);
+	u32 *temp_bootwait = (u32 *)tui_do_menu(&menu);
 	if (temp_bootwait != NULL)
 	{
 		h_cfg.bootwait = *(u32 *)temp_bootwait;
@@ -434,8 +446,8 @@ void config_bootdelay()
 
 void config_verification()
 {
-	gfx_clear_grey(&gfx_ctxt, 0x00);
-	gfx_con_setpos(&gfx_con, 0, 0);
+	gfx_clear_black(0x00);
+	gfx_con_setpos(0, 0);
 
 	ment_t *ments = (ment_t *)malloc(sizeof(ment_t) * 6);
 	u32 *vr_values = (u32 *)malloc(sizeof(u32) * 3);
@@ -469,7 +481,7 @@ void config_verification()
 	memset(&ments[5], 0, sizeof(ment_t));
 	menu_t menu = {ments, "Backup & Restore verification", 0, 0};
 
-	u32 *temp_verification = (u32 *)tui_do_menu(&gfx_con, &menu);
+	u32 *temp_verification = (u32 *)tui_do_menu(&menu);
 	if (temp_verification != NULL)
 	{
 		h_cfg.verification = *(u32 *)temp_verification;
@@ -487,8 +499,8 @@ void config_verification()
 
 void config_backlight()
 {
-	gfx_clear_grey(&gfx_ctxt, 0x00);
-	gfx_con_setpos(&gfx_con, 0, 0);
+	gfx_clear_black(0x00);
+	gfx_con_setpos(0, 0);
 
 	u32 bri_entries = 11;
 
@@ -528,7 +540,7 @@ void config_backlight()
 	memset(&ments[i + 1], 0, sizeof(ment_t));
 	menu_t menu = {ments, "Backlight brightness", 0, 0};
 
-	u32 *temp_backlight = (u32 *)tui_do_menu(&gfx_con, &menu);
+	u32 *temp_backlight = (u32 *)tui_do_menu(&menu);
 	if (temp_backlight != NULL)
 	{
 		h_cfg.backlight = (*(u32 *)temp_backlight) * 2;
@@ -546,13 +558,13 @@ void config_backlight()
 
 void config_auto_hos_poweroff()
 {
-	gfx_clear_grey(&gfx_ctxt, 0x00);
-	gfx_con_setpos(&gfx_con, 0, 0);
+	gfx_clear_black(0x00);
+	gfx_con_setpos(0, 0);
 
 	ment_t *ments = (ment_t *)malloc(sizeof(ment_t) * 6);
 	u32 *hp_values = (u32 *)malloc(sizeof(u32) * 3);
 
-	for (u32 j = 0; j < 3; j++)
+	for (u32 j = 0; j < 2; j++)
 	{
 		hp_values[j] = j;
 		ments[j + 2].type = MENT_DATA;
@@ -568,25 +580,17 @@ void config_auto_hos_poweroff()
 	{
 		ments[2].caption = " Disable";
 		ments[3].caption = "*Enable";
-		ments[4].caption = " Enable (No logo)";
-	}
-	else if (h_cfg.autohosoff >= 2)
-	{
-		ments[2].caption = " Disable";
-		ments[3].caption = " Enable";
-		ments[4].caption = "*Enable (No logo)";
 	}
 	else
 	{
 		ments[2].caption = "*Disable";
 		ments[3].caption = " Enable";
-		ments[4].caption = " Enable (No logo)";
 	}
 
-	memset(&ments[5], 0, sizeof(ment_t));
+	memset(&ments[4], 0, sizeof(ment_t));
 	menu_t menu = {ments, "Power off if woke up from HOS", 0, 0};
 
-	u32 *temp_autohosoff = (u32 *)tui_do_menu(&gfx_con, &menu);
+	u32 *temp_autohosoff = (u32 *)tui_do_menu(&menu);
 	if (temp_autohosoff != NULL)
 	{
 		h_cfg.autohosoff = *(u32 *)temp_autohosoff;
@@ -603,8 +607,8 @@ void config_auto_hos_poweroff()
 
 void config_nogc()
 {
-	gfx_clear_grey(&gfx_ctxt, 0x00);
-	gfx_con_setpos(&gfx_con, 0, 0);
+	gfx_clear_black(0x00);
+	gfx_con_setpos(0, 0);
 
 	ment_t *ments = (ment_t *)malloc(sizeof(ment_t) * 5);
 	u32 *cb_values = (u32 *)malloc(sizeof(u32) * 2);
@@ -635,7 +639,7 @@ void config_nogc()
 	memset(&ments[4], 0, sizeof(ment_t));
 	menu_t menu = {ments, "No Gamecard", 0, 0};
 
-	u32 *temp_nogc = (u32 *)tui_do_menu(&gfx_con, &menu);
+	u32 *temp_nogc = (u32 *)tui_do_menu(&menu);
 	if (temp_nogc != NULL)
 	{
 		h_cfg.autonogc = *(u32 *)temp_nogc;

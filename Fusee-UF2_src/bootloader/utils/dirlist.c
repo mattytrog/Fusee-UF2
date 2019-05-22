@@ -21,7 +21,7 @@
 #include "../mem/heap.h"
 #include "../utils/types.h"
 
-char *dirlist(const char *directory, const char *pattern, bool includeHiddenFiles)
+char *dirlist(const char *directory, const char *pattern, bool includeHiddenFiles, bool markDirectories)
 {
 	u8 max_entries = 61;
 
@@ -29,11 +29,11 @@ char *dirlist(const char *directory, const char *pattern, bool includeHiddenFile
 	u32 i = 0, j = 0, k = 0;
 	DIR dir;
 	static FILINFO fno;
-	
+	static bool valid = false;
 	char *dir_entries = (char *)calloc(max_entries, 256);
 	char *temp = (char *)calloc(1, 256);
 
-	if (!pattern && !f_opendir(&dir, directory))
+	if (!pattern && !f_opendir(&dir, directory)&& !markDirectories)
 	{
 		for (;;)
 		{
@@ -50,6 +50,44 @@ char *dirlist(const char *directory, const char *pattern, bool includeHiddenFile
 		}
 		f_closedir(&dir);
 	}
+	
+	else if (!pattern && !f_opendir(&dir, directory) && markDirectories)
+	{
+		for (;;)
+		{
+			res = f_readdir(&dir, &fno);
+			if (res || !fno.fname[0])
+				break;
+			if (!strcmp (fno.fname + strlen (fno.fname) - 4, ".bin") 
+						|| !strcmp (fno.fname + strlen (fno.fname) - 4, ".ini") 
+						|| fno.fattrib & AM_DIR){
+				valid = true;
+			}
+			
+			if (!strcmp (fno.fname + strlen (fno.fname) - 4, ".nca")) {
+				valid = false;
+			}
+				
+			if (valid && fno.fattrib & AM_DIR){
+				memcpy(fno.fname + strlen(fno.fname), " <Dir> ", 8);
+				memcpy(dir_entries + (k * 256), fno.fname, strlen(fno.fname) + 1);
+				}
+			if (valid && !(fno.fattrib & AM_DIR)) {
+				memcpy(fno.fname + strlen(fno.fname), "       ", 8);
+				memcpy(dir_entries + (k * 256), fno.fname, strlen(fno.fname) + 1);
+				}
+			if (valid){	
+				k++;
+				valid = false;
+			}
+		
+				if (k > (max_entries - 1))
+					break;
+		
+		}
+		f_closedir(&dir);
+	}
+	
 	else if (pattern && !f_findfirst(&dir, &fno, directory, pattern) && fno.fname[0])
 	{
 		do

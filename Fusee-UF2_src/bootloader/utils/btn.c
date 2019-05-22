@@ -22,6 +22,7 @@
 #include "util.h"
 #include "../power/max77620.h"
 
+extern void screenshot();
 u32 btn_read()
 {
 	u32 res = 0;
@@ -29,8 +30,19 @@ u32 btn_read()
 		res |= BTN_VOL_DOWN;
 	if (!gpio_read(GPIO_PORT_X, GPIO_PIN_6))
 		res |= BTN_VOL_UP;
-	if (i2c_recv_byte(4, MAX77620_I2C_ADDR, 0x15) & 0x4)
+	if (i2c_recv_byte(4, MAX77620_I2C_ADDR, 0x15) & 0x4){
+		res = 0;
+		if (i2c_recv_byte(4, MAX77620_I2C_ADDR, 0x15) & 0x4 && !gpio_read(GPIO_PORT_X, GPIO_PIN_6)){
+		res = 0;
+		screenshot();
+		btn_wait();
+		res = 0;
+		return res;
+		}
+	}
+	if (!(i2c_recv_byte(4, MAX77620_I2C_ADDR, 0x15) & 0x4)){
 		res |= BTN_POWER;
+	}
 	return res;
 }
 
@@ -51,10 +63,15 @@ u32 btn_wait()
 		res = btn_read();
 		//Power button up, remove filter.
 		if (!(res & BTN_POWER) && pwr)
+		{
 			pwr = false;
+		}
 		else if (pwr) //Power button still down.
+		{	
 			res &= ~BTN_POWER;
-	} while (btn == res);
+		} 
+	} 
+	while (btn == res);
 
 	return res;
 }

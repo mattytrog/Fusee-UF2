@@ -19,12 +19,14 @@
 #include "sdmmc.h"
 #include "mmc.h"
 #include "sd.h"
+#include "../config/config.h"
 #include "../gfx/gfx.h"
 #include "../mem/heap.h"
 #include "../utils/util.h"
 
-//#define DPRINTF(...) gfx_printf(&gfx_con, __VA_ARGS__)
+//#define DPRINTF(...) gfx_printf(__VA_ARGS__)
 #define DPRINTF(...)
+
 
 static inline u32 unstuff_bits(u32 *resp, u32 start, u32 size)
 {
@@ -425,7 +427,7 @@ static int _mmc_storage_enable_HS400(sdmmc_storage_t *storage)
 static int _mmc_storage_enable_highspeed(sdmmc_storage_t *storage, u32 card_type, u32 type)
 {
 	//TODO: this should be a config item.
-	//---v
+	// --v
 	if (!1 || sdmmc_get_voltage(storage->sdmmc) != SDMMC_POWER_1_8)
 		goto out;
 
@@ -519,7 +521,7 @@ int sdmmc_storage_init_mmc(sdmmc_storage_t *storage, sdmmc_t *sdmmc, u32 id, u32
 	free(ext_csd);
 	DPRINTF("[MMC] got ext_csd\n");
 	_mmc_storage_parse_cid(storage); //This needs to be after csd and ext_csd
-	//gfx_hexdump(&gfx_con, 0, ext_csd, 512);
+	//gfx_hexdump(0, ext_csd, 512);
 
 	/* When auto BKOPS is enabled the mmc device should be powered all the time until we disable this and check status.
 	   Disable it for now until BKOPS disable added to power down sequence at sdmmc_storage_end().
@@ -530,7 +532,9 @@ int sdmmc_storage_init_mmc(sdmmc_storage_t *storage, sdmmc_t *sdmmc, u32 id, u32
 		DPRINTF("[MMC] BKOPS enabled\n");
 	}
 	else
+	{
 		DPRINTF("[MMC] BKOPS disabled\n");
+	}
 
 	if (!_mmc_storage_enable_highspeed(storage, storage->ext_csd.card_type, type))
 		return 0;
@@ -704,7 +708,7 @@ int _sd_storage_get_scr(sdmmc_storage_t *storage, u8 *buf)
 
 	u32 tmp = 0;
 	sdmmc_get_rsp(storage->sdmmc, &tmp, 4, SDMMC_RSP_TYPE_1);
-    //Prepare buffer for unstuff_bits
+	//Prepare buffer for unstuff_bits
 	for (int i = 0; i < 8; i+=4)
 	{
 		storage->raw_scr[i + 3] = buf[i];
@@ -713,7 +717,7 @@ int _sd_storage_get_scr(sdmmc_storage_t *storage, u8 *buf)
 		storage->raw_scr[i]     = buf[i + 3];
 	}
 	_sd_storage_parse_scr(storage);
-	//gfx_hexdump(&gfx_con, 0, storage->raw_scr, 8);
+	//gfx_hexdump(0, storage->raw_scr, 8);
 
 	return _sdmmc_storage_check_result(tmp);
 }
@@ -825,12 +829,13 @@ int _sd_storage_enable_highspeed_low_volt(sdmmc_storage_t *storage, u32 type, u8
 
 	if (!_sd_storage_switch_get(storage, buf))
 		return 0;
-	//gfx_hexdump(&gfx_con, 0, (u8 *)buf, 64);
+	//gfx_hexdump(0, (u8 *)buf, 64);
 
 	u32 hs_type = 0;
 	switch (type)
 	{
 	case 11:
+		// Fall through if not supported.
 		if (buf[13] & SD_MODE_UHS_SDR104)
 		{
 			type = 11;
@@ -839,7 +844,6 @@ int _sd_storage_enable_highspeed_low_volt(sdmmc_storage_t *storage, u32 type, u8
 			storage->csd.busspeed = 104;
 			break;
 		}
-		//Fall through.
 	case 10:
 		if (buf[13] & SD_MODE_UHS_SDR50)
 		{
@@ -875,8 +879,8 @@ int _sd_storage_enable_highspeed_high_volt(sdmmc_storage_t *storage, u8 *buf)
 {
 	if (!_sd_storage_switch_get(storage, buf))
 		return 0;
-	//gfx_hexdump(&gfx_con, 0, (u8 *)buf, 64);
-	if (!(buf[13] & 2))
+	//gfx_hexdump(0, (u8 *)buf, 64);
+	if (!(buf[13] & SD_MODE_HIGH_SPEED))
 		return 1;
 
 	if (!_sd_storage_enable_highspeed(storage, 1, buf))
@@ -963,7 +967,7 @@ static int _sd_storage_get_ssr(sdmmc_storage_t *storage, u8 *buf)
 		storage->raw_ssr[i]     = buf[i + 3];
 	}
 	_sd_storage_parse_ssr(storage);
-	//gfx_hexdump(&gfx_con, 0, storage->raw_ssr, 64);
+	//gfx_hexdump(0, storage->raw_ssr, 64);
 
 	return _sdmmc_storage_check_result(tmp);
 }
@@ -1010,6 +1014,10 @@ static void _sd_storage_parse_csd(sdmmc_storage_t *storage)
 int sdmmc_storage_init_sd(sdmmc_storage_t *storage, sdmmc_t *sdmmc, u32 id, u32 bus_width, u32 type)
 {
 	int is_version_1 = 0;
+	
+	// Some cards (Sandisk U1), do not like a fast power cycle. Wait min 100ms.
+	if (id == SDMMC_1)
+		msleep(100);
 
 	memset(storage, 0, sizeof(sdmmc_storage_t));
 	storage->sdmmc = sdmmc;
@@ -1088,7 +1096,7 @@ int sdmmc_storage_init_sd(sdmmc_storage_t *storage, sdmmc_t *sdmmc, u32 id, u32 
 		return 0;
 	}
 		
-	//gfx_hexdump(&gfx_con, 0, storage->raw_scr, 8);
+	//gfx_hexdump(0, storage->raw_scr, 8);
 	DPRINTF("[SD] got scr\n");
 
 	// Check if card supports a wider bus and if it's not SD Version 1.X
@@ -1103,7 +1111,9 @@ int sdmmc_storage_init_sd(sdmmc_storage_t *storage, sdmmc_t *sdmmc, u32 id, u32 
 		DPRINTF("[SD] switched to wide bus width\n");
 	}
 	else
+	{
 		DPRINTF("[SD] SD does not support wide bus width\n");
+	}
 
 	if (storage->is_low_voltage)
 	{
@@ -1129,7 +1139,9 @@ int sdmmc_storage_init_sd(sdmmc_storage_t *storage, sdmmc_t *sdmmc, u32 id, u32 
 
 	// Parse additional card info from sd status.
 	if (_sd_storage_get_ssr(storage, buf))
+	{
 		DPRINTF("[SD] got sd status\n");
+	}
 
 	free(buf);
 	return 1;

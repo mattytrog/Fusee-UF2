@@ -33,6 +33,7 @@
 
 extern gfx_con_t gfx_con;
 #define SDMMC_UPPER_BUFFER 0xB8000000
+#define DRAM_START         0x80000000
 
 extern sdmmc_storage_t sd_storage;
 extern sdmmc_storage_t storage;
@@ -54,17 +55,17 @@ static sector_cache_t *sector_cache = NULL;
 static u32 secindex = 0;
 
 DSTATUS disk_status (
-    BYTE pdrv /* Physical drive nmuber to identify the drive */
+	BYTE pdrv		/* Physical drive nmuber to identify the drive */
 )
 {
-    return 0;
+	return 0;
 }
 
 DSTATUS disk_initialize (
-    BYTE pdrv /* Physical drive nmuber to identify the drive */
+	BYTE pdrv				/* Physical drive nmuber to identify the drive */
 )
 {
-    return 0;
+	return 0;
 }
 
 static inline void _gf256_mul_x_le(void *block) {
@@ -142,13 +143,13 @@ DRESULT disk_read (
     case 0:
         if ((u32)buff >= 0x90000000)
             return sdmmc_storage_read(&sd_storage, sector, count, buff) ? RES_OK : RES_ERROR;
-	u8 *buf = (u8 *)SDMMC_UPPER_BUFFER; //TODO: define this somewhere.
-        if (sdmmc_storage_read(&sd_storage, sector, count, buf))
-        {
-            memcpy(buff, buf, 512 * count);
-            return RES_OK;
-        }
-        return RES_ERROR;
+	u8 *buf = (u8 *)SDMMC_UPPER_BUFFER;
+	if (sdmmc_storage_read(&sd_storage, sector, count, buf))
+	{
+		memcpy(buff, buf, 512 * count);
+		return RES_OK;
+	}
+	return RES_ERROR;
     case 1:
         if (!sector_cache) // init sector cache
             sector_cache = (sector_cache_t*)malloc(sizeof(sector_cache_t) * MAX_SEC_CACHE_ENTRIES);
@@ -208,7 +209,7 @@ DRESULT disk_read (
         } else {
             u8 *buf = (u8 *)0x98000000;
             if (nx_emmc_part_read(&storage, system_part, sector, count, buf)) {
-                gfx_printf(&gfx_con, "sec %d count %d\n", sector, count);
+                gfx_printf("sec %d count %d\n", sector, count);
                 // _emmc_xts(9, 8, 0, tweak, (sector + 0x20 - 1) / 0x20, buf, buf, count * 0x200);
                 //se_aes_xts_crypt(8, 9, 0, sector / 0x20, buf, buf, 0x200, (count + 0x20 - 1) / 0x20);
                 memcpy(buff, buf, 512 * count);
@@ -220,11 +221,14 @@ DRESULT disk_read (
     return RES_ERROR;
 }
 
+/*-----------------------------------------------------------------------*/
+/* Write Sector(s)                                                       */
+/*-----------------------------------------------------------------------*/
 DRESULT disk_write (
-    BYTE pdrv,			/* Physical drive nmuber to identify the drive */
-    const BYTE *buff,	/* Data to be written */
-    DWORD sector,		/* Start sector in LBA */
-    UINT count			/* Number of sectors to write */
+	BYTE pdrv,			/* Physical drive nmuber to identify the drive */
+	const BYTE *buff,	/* Data to be written */
+	DWORD sector,		/* Start sector in LBA */
+	UINT count			/* Number of sectors to write */
 )
 {
     if (pdrv == 1)

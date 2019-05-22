@@ -1,5 +1,6 @@
 // Sam_fusee_launcher - Credits to quantum_cross & atlas44 for original code
 // Switchboot_Part_2
+//marker
 #include <Arduino.h>
 #include <Usb.h>
 #include <FlashStorage.h>
@@ -9,21 +10,23 @@
 #endif
 ///////////////////////////////////////////////////////////////////CHANGE THIS TO YOUR LIKING!!!
 #define DEFAULT_MODE 1
-#define MODES_AVAILABLE 5
+#define MODES_AVAILABLE 2
 #define BLINK_PAYLOAD_BEFORE_SEARCH 0
 #define BLINK_PAYLOAD_AFTER_SEARCH 1
 #define DEFAULT_DOTSTAR_BRIGHTNESS 128
 
 //////////////////////////////////////////////////////////////////////////////////////////BOARDS
 // uncomment your chip and comment the others. Will build!!!
+
+#define DISABLE_STRAP_INFO_TXT 1 //comment out if making a bin file
 //#define TRINKET
 //#define TRINKETMETHOD3
 //#define TRINKETLEGACY3
 //#define REBUG
 //#define GEMMA
 //#define ITSYBITSY
-//#define FEATHER
-#define RCMX86_INTERNAL
+#define FEATHER
+//#define RCMX86_INTERNAL
 //#define EXEN_MINI **currently incomplete
 //#define RCMX86
 //#define R4S
@@ -33,6 +36,7 @@
 //////////////////////////////////////////////////////////////////////////////////////////======
 
 //Globals
+
 #define MODESWITCH_ENABLED 1 // Enables / Disables modeswitch. If disabled, default values used in modes. 1 = modeswitch enabled, 0 = pin 4 will reset SAMD upon being grounded
 #define AUTO_SEND_ON_PAYLOAD_INCREASE_PIN 0  //Automatic send when payload pin is activated. 1 = on, 0 = off
 #define LOOK_FOR_TEGRA_LED_SPEED 100 //How fast to blink when searching. Higher = slower
@@ -81,7 +85,7 @@ unsigned long LONG_PRESS_TRIGGER2 = 5000;//5 seconds long press
 unsigned long LONG_PRESS_TRIGGER3 = 7000;//7 seconds lng press
 unsigned long VOL_TICK_TIMER = 0;
 bool flatbatt = false;
-bool hekate; bool argon;
+bool hekate; bool fusee;
 bool chipdisabled = EEPROM_CHIP_DISABLED.read();
 
 extern void mode_check();
@@ -91,9 +95,6 @@ extern void long_press();
 #include "hkpart1.h"
 #include "hkpart2.h"
 #include "hkpart3.h"
-#include "hkpart4.h"
-#include "hkpart5.h"
-#include "argon.h"
 #include "modes.h"
 #include "boards.h"
 #include "usb_setup.h"
@@ -583,6 +584,7 @@ void lookfortegra() {
 
   int currentTime = 0;
   bool blink = true;
+
   while (!foundTegra)
   {
     usb.Task();
@@ -630,7 +632,6 @@ void pushpayload() {
   DEBUG_PRINTLN("Sending payload...");
   UHD_Pipe_Alloc(tegraDeviceAddress, 0x01, USB_HOST_PTYPE_BULK, USB_EP_DIR_OUT, 0x40, 0, USB_HOST_NB_BK_1);
   packetsWritten = 0;
-  if (hekate == true) {
     if (UNWRITTEN_PAYLOAD_NUMBER == 1) {
       sendPayload(HKSECTION_1, 12);
     } else if (UNWRITTEN_PAYLOAD_NUMBER == 2) {
@@ -648,9 +649,6 @@ void pushpayload() {
     } else if (UNWRITTEN_PAYLOAD_NUMBER == 8) {
       sendPayload(HKSECTION_8, 12);
     }
-  } else if (argon == true) {
-    sendPayload (ARGON, ARGON_SIZE);
-  }
 
   if (packetsWritten % 2 != 1)
   {
@@ -685,19 +683,7 @@ void setup()
     increase_payload_automatic(); //if autoincrease is enabled, payload counter will increase just before entering standby
     lookfortegra();
   } else {
-    usb.Task(); //host mode
-#ifdef ONBOARD_LED
-    pinMode(ONBOARD_LED, OUTPUT);
-#endif
-    battery_check();
-    normalstraps();
-    run_once();
-    setinterrupts();
-    firstboot(); //get flash memory status. If invalid, make valid.
-    mode_check();
-    increase_payload_automatic(); //if autoincrease is enabled, payload counter will increase just before entering standby
     sleep(-1);
-
   }
 }
 

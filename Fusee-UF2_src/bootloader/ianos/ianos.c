@@ -29,7 +29,7 @@
 
 extern heap_t _heap;
 
-extern void *sd_file_read(char *path);
+extern void *sd_file_read(const char *path, u32 *fsize);
 extern bool sd_mount();
 extern void sd_unmount();
 
@@ -70,19 +70,19 @@ void ianos_print_error(int errorno)
 	switch (errorno)
 	{
 	case 1:
-		gfx_printf(&gfx_con, "Can't find library!\n");
+		gfx_printf("Can't find library!\n");
 		break;
 	case 2:
-		gfx_printf(&gfx_con, "Cant init ELF context!\n");
+		gfx_printf("Cant init ELF context!\n");
 		break;
 	case 3:
-		gfx_printf(&gfx_con, "Cant alloc memory!\n");
+		gfx_printf("Cant alloc memory!\n");
 		break;
 	case 4:
-		gfx_printf(&gfx_con, "Error loading ELF!\n");
+		gfx_printf("Error loading ELF!\n");
 		break;
 	case 5:
-		gfx_printf(&gfx_con, "Error relocating ELF!\n");
+		gfx_printf("Error relocating ELF!\n");
 		break;
 	}
 }
@@ -101,7 +101,7 @@ int ianos_loader(bool sdmount, char *path, elfType_t type, void *moduleConfig)
 		}
 	}
 
-	fileBuf = sd_file_read(path);
+	fileBuf = sd_file_read(path, NULL);
 
 	if (sdmount)
 		sd_unmount();

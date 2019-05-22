@@ -139,70 +139,77 @@ void sendPayload(const byte *payload, uint32_t payloadLength)
 
   usbBufferedWrite(intermezzo, INTERMEZZO_SIZE);
   usbBufferedWrite(zeros, 0xFA4);
-  if (hekate == true){
-  usbBufferedWrite(HKPART1, 38496);
-  usbBufferedWrite(payload, payloadLength);
-  usbBufferedWrite(inbetween_payloads, 13);
-  usbBufferedWrite(payload, payloadLength);
-  usbBufferedWrite(PART2, 127);
-  usbBufferedWrite(SAMDSELECTION,18);
-  //extra char
-  usbBufferedWrite(ONEBYTEA,1); // as payload length (payloadx.bin) is 12... less than 14 chars
-  //
-  usbBufferedWrite(payload, payloadLength);
-  usbBufferedWrite(ONEBYTEB,1); // as payload length (payloadx.bin) is 12... less than 14 chars
-  usbBufferedWrite(MODE, 18);
+  if (fusee == true){
+   usbBufferedWrite(FSPART1,41112);
+   usbBufferedWrite(payload, 12);
+   usbBufferedWrite(INBETWEENPL,24);
+   usbBufferedWrite(payload, 12);
+   usbBufferedWrite(fsnewline4, 4);
+   usbBufferedWrite(PAYLOADBIN, 11);
+   usbBufferedWrite(INBETWEENPL2,21);
+   usbBufferedWrite(PAYLOADBIN, 11);
+   usbBufferedWrite(FSAFTERPL1, 141);
+
+  usbBufferedWrite(OVERRIDE1, 34); usbBufferedWrite(PAYLOADBIN, 11); usbBufferedWrite(UNDER_LINE1, 7);
+  /////
+  usbBufferedWrite(OVERRIDE2, 33); usbBufferedWrite(payload, 12); usbBufferedWrite(fsnewline3, 3);
+  /////
+  usbBufferedWrite(MODE, 7);
   if (UNWRITTEN_MODE_NUMBER == 1){
-    usbBufferedWrite(NUM1, 14);
+    usbBufferedWrite(NUM1, 38);
   } else if (UNWRITTEN_MODE_NUMBER == 2){
-    usbBufferedWrite(NUM2, 14);
+    usbBufferedWrite(NUM2, 38);
   } else if (UNWRITTEN_MODE_NUMBER == 3){
-    usbBufferedWrite(NUM3, 14);
+    usbBufferedWrite(NUM3, 38);
   } else if (UNWRITTEN_MODE_NUMBER == 4){
-    usbBufferedWrite(NUM4, 14);
+    usbBufferedWrite(NUM4, 38);
   } else if (UNWRITTEN_MODE_NUMBER == 5){
-    usbBufferedWrite(NUM5, 14);
+    usbBufferedWrite(NUM5, 38);
   }
-  usbBufferedWrite(USBSTRAP,18);
+  /////
+  usbBufferedWrite(fsnewline3, 3);
+  usbBufferedWrite(USBSTRAP,7);
   #ifdef DONGLE
-  usbBufferedWrite(NOCHIPFOUND,14);
+  usbBufferedWrite(NOTFOUND,38);
  #else
   if (USB_STRAP_TEST == 1) {
-    usbBufferedWrite(YES, 14);
+    usbBufferedWrite(YES, 38);
   } else {
-    usbBufferedWrite(NO, 14);
+    usbBufferedWrite(NO, 38);
   }
  #endif
-
-  usbBufferedWrite(VOLPLUSSTRAP,18);
-  #ifdef DONGLE
-  usbBufferedWrite(NOCHIPFOUND,14);
+ /////
+usbBufferedWrite(fsnewline3, 3);
+usbBufferedWrite(VOLPLUSSTRAP,7);
+ #ifdef DONGLE
+  usbBufferedWrite(NOTFOUND,38);
   #else
   if (VOLUP_STRAP_TEST == 1) {
-    usbBufferedWrite(YES, 14);
+    usbBufferedWrite(YES, 38);
   } else {
-    usbBufferedWrite(NO, 14);
+    usbBufferedWrite(NO, 38);
   }
 #endif
-
- usbBufferedWrite(JOYCONSTRAP,18);
- #ifdef DONGLE
- usbBufferedWrite(NOCHIPFOUND,14);
- #else
+/////
+usbBufferedWrite(fsnewline3, 3);
+usbBufferedWrite(JOYCONSTRAP,7);
+#ifdef DONGLE
+ usbBufferedWrite(NOTFOUND,38);
+#else
   if (JOYCON_STRAP_TEST == 1) {
-    usbBufferedWrite(YES, 14);
+    usbBufferedWrite(YES, 38);
   } else {
-    usbBufferedWrite(NO, 14);
+    usbBufferedWrite(NO, 38);
   }
 #endif
-
- usbBufferedWrite(BOARDNAME, 31);
- usbBufferedWrite(PART3, 1232);
- usbBufferedWrite(payload, payloadLength);
- usbBufferedWrite(PART4, 8709);
-  } else 
-  if (argon == true){
-    usbBufferedWrite(payload, payloadLength);
+/////
+usbBufferedWrite(fsnewline3, 3);
+usbBufferedWrite(BOARDNAME, 45);
+/////
+usbBufferedWrite(fsnewline3, 3);
+usbBufferedWrite(FSPART3,1685);
+usbBufferedWrite(payload, 12);
+usbBufferedWrite(FSPART4,8819);   
   }
   usbFlushBuffer();
 }
@@ -255,7 +262,6 @@ void standby(){
   #ifdef USB_LOGIC
   digitalWrite(USB_LOGIC, HIGH);
   #endif
-  
   SCB->SCR |= SCB_SCR_SLEEPDEEP_Msk; /* Enable deepsleep */
 
   GCLK->CLKCTRL.reg = uint16_t(
